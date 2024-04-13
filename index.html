@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+	<meta charset="utf-8">
+	<title>Summoned</title>
+	<style>
+		body {
+			margin: 0;
+		}
+
+		h4 {
+			line-height: 1.2;
+			margin: 0px;
+		}
+
+		.vt323-regular {
+			font-family: "VT323", monospace;
+			font-weight: 400;
+			font-style: normal;
+		}
+
+		.summonsDocument {
+			font-family: "VT323", monospace;
+			font-size: 20px;
+			color: black;
+			background-color: white;
+			position: absolute;
+			top: 20%;
+			left: 50%;
+			width: 200px;
+			margin: 10px;
+			z-index: 100000;
+			padding: 10px;
+			/* border: 1px solid black; */
+			display: none;
+		}
+
+		.tail {
+			position: absolute;
+			bottom: -40px;
+			right: 40px;
+			width: 32px;
+			height: 32px;
+			background-color: white;
+		}
+
+		.tail2 {
+			position: absolute;
+			bottom: -80px;
+			right: 80px;
+			width: 16px;
+			height: 16px;
+			background-color: white;
+		}
+
+		.franticRedText {
+			position: absolute;
+			top: 40%;
+			left: 25%;
+			font-family: "VT323", monospace;
+			font-size: 80px;
+			animation: franticMove 0.1s infinite;
+			color: red;
+			width: 50%;
+			text-align: center;
+			z-index: 1000000;
+			transform: translate(-50%, -50%);
+			display: none;
+		}
+
+		@keyframes franticMove {
+			0% { transform: translate(0, 0); }
+			25% { transform: translate(2px, 0); }
+			50% { transform: translate(0, 2px); }
+			75% { transform: translate(-2px, 0); }
+			100% { transform: translate(0, -2px); }
+		}
+
+	</style>
+</head>
+
+<body>
+	<div id="obey" class="franticRedText">Draft summons !</div>
+	<div id="summonsDocumentContainer" class="debug summonsDocument"><img
+			src="/assets/textures/buildings/document-header.png" />
+		<div id="summonsDocumentText"></div>
+		<div class="tail"></div>
+		<div class="tail2"></div>
+	</div>
+	<script type="module" src="/main.ts"></script>
+</body>
+
+</html>
