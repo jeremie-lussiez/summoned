@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import RAPIER, { ActiveEvents } from '@dimforge/rapier2d-compat';
+import RAPIER, { ActiveEvents, Collider } from '@dimforge/rapier2d-compat';
 import { playerAnimations } from './game/animations/player-animations';
 import { summonsReasons } from './game/lists/summons-reasons';
 import { summonsPlaces } from './game/lists/summons-places';
@@ -10,15 +10,59 @@ import { portalAnimations } from './game/animations/portal-animations';
 import { gobAnimations } from './game/animations/gob-animations';
 import { Mesh } from 'three';
 
+const obeyDiv: HTMLDivElement = document.getElementById('obey') as HTMLDivElement;
+const summonsTextDiv: HTMLDivElement = document.getElementById('summons') as HTMLDivElement;
+const summonsDocumentTextDiv: HTMLDivElement = document.getElementById('summonsDocumentText') as HTMLDivElement;
+const summonsContainerDiv: HTMLDivElement = document.getElementById('summonsDocumentContainer') as HTMLDivElement;
+const music = document.getElementById('music');
+
 let playerHasBeenSummoned = false;
 let isFighting = false;
-const documentsBeforePortal = 5;
-const travellingSpeed = 0.005;
+let documentsBeforePortal = 23;
+const travellingSpeed = 0.0005;
 const workingPower = 1000;
-const moveStrength = 30;
+const moveStrength = 60;
 const printerStrength = 100;
 let suckStrength = 10.5;
-let playerSuckStrength = 250;
+let playerSuckStrength = 25;
+
+const gameState = {
+    index: 0,
+    states: [
+        {
+            id: 'intro',
+            actions: () => {
+                isFighting = false;
+                playerHasBeenSummoned = false;
+                documentsBeforePortal = 5;
+            }
+        },
+        {
+            id: 'atWork',
+            actions: () => {
+                isFighting = false;
+                playerHasBeenSummoned = false;
+                documentsBeforePortal = 5;
+            }
+        },
+        {
+            id: 'working',
+            actions: () => {
+                isFighting = false;
+                playerHasBeenSummoned = false;
+                documentsBeforePortal = 5;
+            }
+        },
+        {
+            id: 'sucked',
+            actions: () => {
+                isFighting = false;
+                playerHasBeenSummoned = false;
+                documentsBeforePortal = 5;
+            }
+        }
+    ]
+}
 
 const scene = new THREE.Scene();
 
@@ -265,6 +309,7 @@ let lastTime = performance.now();
 let sceneIsReady = false;
 let darken = 1;
 let lastVelocityDirection = '';
+let playerIsIddle = false;
 function animate() {
     requestAnimationFrame(animate);
     renderer.render(scene, camera);
@@ -340,9 +385,20 @@ function animate() {
         gob.update(now);
         const currentGobMesh = gob.mesh;
         if (currentGobMesh.userData) {
-            currentGobMesh.position.y = currentGobMesh.userData.translation().y;
-            currentGobMesh.position.x = currentGobMesh.userData.translation().x;
-            currentGobMesh.rotation.z = currentGobMesh.userData.rotation();
+            const body = currentGobMesh.userData;
+
+            currentGobMesh.position.y = body.translation().y;
+            currentGobMesh.position.x = body.translation().x;
+            currentGobMesh.rotation.z = body.rotation();
+
+            if (!gob.mesh.isDead) {
+                const velocity = body.linvel();
+                if (Math.abs(velocity.x) < 0.01) {
+                    gob.setAnimation('iddle');
+                } else {
+                    gob.setAnimation('walking');
+                }
+            }
         }
     });
 
@@ -364,14 +420,11 @@ function animate() {
             backgroundPlate.material.opacity = 0;
         }
     } else if (!sceneIsReady) {
-        const music = document.getElementById('music')
         music.volume = 0.2;
         music.play();
         sceneIsReady = true;
-        const obeyDiv: HTMLDivElement = document.getElementById('obey') as HTMLDivElement;
         obeyDiv.style.display = 'block';
-        const summonsDiv: HTMLDivElement = document.getElementById('summons') as HTMLDivElement;
-        summonsDiv.style.display = 'block';
+        summonsTextDiv.style.display = 'block';
         buildingsMeshes.forEach((buildingMesh) => {
             buildingMesh.visible = false;
         });
@@ -389,9 +442,11 @@ function animate() {
             const velocity = body.linvel();
             if (Math.abs(velocity.x) < 0.01) {
                 playerSprite.setAnimation('iddle' + lastVelocityDirection);
+                playerIsIddle = true;
             } else {
                 const direction: string = velocity.x > 0 ? 'Right' : 'Left';
-                if (lastVelocityDirection !== direction) {
+                if (lastVelocityDirection !== direction || playerIsIddle) {
+                    playerIsIddle = false;
                     playerSprite.setAnimation('walking' + direction);
                     lastVelocityDirection = direction;
                 }
@@ -403,7 +458,7 @@ function animate() {
 }
 animate();
 
-let world;
+let world: RAPIER.World;
 
 const groundMesh = loadGround();
 groundMesh.position.copy(roomMesh.position);
@@ -463,7 +518,7 @@ RAPIER.init().then(() => {
     const groundRigidBody = world.createRigidBody(groundRigidBodyDesc);
     const groundColliderDesc = RAPIER.ColliderDesc
         .cuboid(1000, 2)
-        .setCollisionGroups(0x00010007)
+        .setCollisionGroups(0x0001000f)
         .setRestitution(0.4);
     const groundCollider = world.createCollider(groundColliderDesc, groundRigidBody);
 
@@ -475,7 +530,8 @@ RAPIER.init().then(() => {
     const ceilingRigidBody = world.createRigidBody(ceilingRigidBodyDesc);
     const ceilingColliderDesc = RAPIER.ColliderDesc
         .cuboid(60, 2)
-        .setCollisionGroups(0x00010007)
+        // .setCollisionGroups(0x00010007)
+        .setCollisionGroups(0x00000000)
         .setRestitution(0.4);
     ceilingCollider = world.createCollider(ceilingColliderDesc, ceilingRigidBody);
 
@@ -487,7 +543,7 @@ RAPIER.init().then(() => {
     const leftWallRigidBody = world.createRigidBody(leftWallRigidBodyDesc);
     const leftWallColliderDesc = RAPIER.ColliderDesc
         .cuboid(2, 60)
-        .setCollisionGroups(0x00010007)
+        .setCollisionGroups(0x0001000f)
         .setRestitution(0.4);
     leftWallCollider = world.createCollider(leftWallColliderDesc, leftWallRigidBody);
 
@@ -499,7 +555,7 @@ RAPIER.init().then(() => {
     const rightWallRigidBody = world.createRigidBody(rightWallRigidBodyDesc);
     const rightWallColliderDesc = RAPIER.ColliderDesc
         .cuboid(2, 60)
-        .setCollisionGroups(0x00010007)
+        .setCollisionGroups(0x0001000f)
         .setRestitution(0.4);
     rightWallCollider = world.createCollider(rightWallColliderDesc, rightWallRigidBody);
 
@@ -514,7 +570,7 @@ RAPIER.init().then(() => {
         if (suck) {
             summonsDocuments.forEach((mesh) => {
                 if (mesh.userData) {
-                    const body = mesh.userData;
+                    const body = mesh.userData as RAPIER.RigidBody;
                     let suckAngle = Math.atan2(
                         portalMesh.position.y - body.translation().y,
                         portalMesh.position.x - body.translation().x
@@ -528,8 +584,10 @@ RAPIER.init().then(() => {
                         Math.pow(portalMesh.position.x - body.translation().x, 2) +
                         Math.pow(portalMesh.position.y - body.translation().y, 2)
                     );
-                    if (distance < 3) {
+                    if (distance < 5) {
+                        world.removeCollider(body.collider(0), true);
                         world.removeRigidBody(body);
+                        mesh.visible = false;
                         mesh.userData = null;
                     }
                 }
@@ -553,14 +611,11 @@ RAPIER.init().then(() => {
                     // world.removeRigidBody(body);
                     playerHasBeenSummoned = true;
                     // playerMesh.userData = null;
-                    const obeyDiv: HTMLDivElement = document.getElementById('obey') as HTMLDivElement;
                     obeyDiv.style.display = 'block';
                     obeyDiv.innerText = 'YOU have been summoned !';
                     // backgroundPlate.material.opacity = 0;
                     smallHandMesh.visible = false;
                     bigHandMesh.visible = false;
-                    const summonsDiv: HTMLDivElement = document.getElementById('summons') as HTMLDivElement;
-                    summonsDiv.style.display = 'none';
                 }
                 if (body) {
                     body.applyImpulse(suckForce, true);
@@ -592,9 +647,6 @@ RAPIER.init().then(() => {
                 if (isLeft) {
                     body.applyImpulse({ x: -moveStrength, y: 0 }, true);
                 }
-                if (isUp) {
-                    body.applyImpulse({ x: 0, y: moveStrength * 2 }, true);
-                }
             }
 
             playerMesh.userData.setRotation(0, true);
@@ -602,36 +654,61 @@ RAPIER.init().then(() => {
 
         world.step(eventQueue);
 
-        eventQueue.drainContactForceEvents((event) => {
-            
-            let handle1 = event.collider1();
-            let handle2 = event.collider2();
+        eventQueue.drainCollisionEvents((handle1, handle2, started) => {
 
-            if (handle1) {
-                const gob = gobs.find((gob) => {
-                    if (gob.mesh.userData && gob.mesh.collider.handle === handle1) {
-                        return true;
-                    }
-                });
-                if (gob && !gob.mesh.isDead) {
-                    console.log('Collision event 1', handle1, event.totalForceMagnitude());
-                    gob.mesh.isDead = true;
-                    gob.setAnimation('dead');
-                    hurtSound.play();
+            if (started) {
+                // let handle1 = event.collider1();
+                // let handle2 = event.collider2();
+
+                let gob;
+                let stuff;
+
+                if (handle1) {
+                    gob = gobs.find((gob) => {
+                        if (gob.mesh.userData && gob.mesh.collider.handle === handle1) {
+                            return true;
+                        }
+                    });
+                    stuff = summonedThings.find((summonedThing) => {
+                        if (summonedThing.userData && summonedThing.collider.handle === handle1) {
+                            return true;
+                        }
+                    });
                 }
-            }
 
-            if (handle2) {
-                const gob = gobs.find((gob) => {
-                    if (gob.mesh.userData && gob.mesh.collider.handle === handle2) {
-                        return true;
+                if (handle2) {
+                    if (!gob) {
+                        gob = gobs.find((gob) => {
+                            if (gob.mesh.userData && gob.mesh.collider.handle === handle2) {
+                                return true;
+                            }
+                        });
                     }
-                });
-                if (gob && !gob.mesh.isDead) {
-                    console.log('Collision event 2', hhandle2, event.totalForceMagnitude());
-                    gob.mesh.isDead = true;
-                    gob.setAnimation('dead');
-                    hurtSound.play();
+                    if (!stuff) {
+                        stuff = summonedThings.find((summonedThing) => {
+                            if (summonedThing.userData && summonedThing.collider.handle === handle2) {
+                                return true;
+                            }
+                        });
+                    }
+                }
+
+                if (gob && stuff) {
+                    if (!gob.mesh.isDead) {
+                        hurtSound.play();
+                        gob.mesh.life -= 100;
+                        if (gob.mesh.life <= 0) {
+                            currentDocument.documentNumber--;
+                            summonsTextDiv.innerText = `Summons: ${currentDocument.documentNumber}`;
+                            gob.mesh.isDead = true;
+                            gob.setAnimation('dead');
+                        }
+                        if (currentDocument.documentNumber === 0) {
+                            summonsTextDiv.innerText = `Go back to the portal!`;
+                            isFighting = false;
+                            playerSprite.setAnimation('falling');
+                        }
+                    }
                 }
             }
 
@@ -668,10 +745,11 @@ const createSummonsDocument = (documentNumber: number): void => {
     const summonsDocumentRigidBody = world.createRigidBody(summonsDocumentRigidBodyDesc);
     const summonsDocumentColliderDesc = RAPIER.ColliderDesc
         .cuboid(1.5, 0.5)
-        .setCollisionGroups(0x00010001)
+        .setCollisionGroups(0x00080001)
         .setRestitution(0.5);
     const summonsDocumentCollider = world.createCollider(summonsDocumentColliderDesc, summonsDocumentRigidBody);
     summonsDocumentMesh.userData = summonsDocumentRigidBody;
+    summonsDocumentMesh.collider = summonsDocumentCollider;
 
     const printerImpulse = { x: -printerStrength, y: 10 };
     summonsDocumentRigidBody.applyImpulse(printerImpulse, true);
@@ -680,10 +758,7 @@ const createSummonsDocument = (documentNumber: number): void => {
 
     const text = `We, ${name}, hereby summon you to appear before the court on ${date} at ${time} in ${place} to answer the following charges: ${reason}. Failure to appear will result in a warrant for your arrest.`;
 
-    const summonsContainerDiv: HTMLDivElement = document.getElementById('summonsDocumentContainer') as HTMLDivElement;
-    const summonsTextDiv: HTMLDivElement = document.getElementById('summonsDocumentText') as HTMLDivElement;
-
-    summonsTextDiv.innerText = text;
+    summonsDocumentTextDiv.innerText = text;
     summonsContainerDiv.style.display = 'block';
 }
 
@@ -783,9 +858,12 @@ const summonStuff = (x: number, y: number, z: number, force: number, angle: numb
     const stuffColliderDesc = RAPIER.ColliderDesc
         .cuboid(definition.width / 2, definition.height / 2)
         .setCollisionGroups(0x00040003)
+        .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.DYNAMIC_DYNAMIC)
+        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS)
         .setRestitution(0.5);
     const stuffCollider = world.createCollider(stuffColliderDesc, stuffRigidBody);
     stuffMesh.userData = stuffRigidBody;
+    stuffMesh.collider = stuffCollider;
 
     const stuffImpulse = { x: Math.cos(angle) * force, y: Math.sin(angle) * force };
     stuffRigidBody.applyImpulse(stuffImpulse, true);
@@ -801,8 +879,6 @@ const summonStuff = (x: number, y: number, z: number, force: number, angle: numb
 let backgroundFade = 1;
 let fadeIntervalId = 0;
 addEventListener('click', (event) => {
-
-    const obeyDiv: HTMLDivElement = document.getElementById('obey') as HTMLDivElement;
 
     if (playerHasBeenSummoned && !isFighting) {
         // isFighting = true;
@@ -822,7 +898,7 @@ addEventListener('click', (event) => {
         rightWallCollider.setCollisionGroups(0x00000000);
         ceilingCollider.setCollisionGroups(0x00000000);
 
-        for (let g = 0; g < 5; g++) {
+        for (let g = 0; g < currentDocument.documentNumber; g++) {
             const gobSprite = new AnimatedSprite('/assets/textures/buildings/isekaied-gob.png', 16, gobAnimations);
             gobSprite.randomAnimation();
             const mesh = gobSprite.mesh;
@@ -840,12 +916,13 @@ addEventListener('click', (event) => {
                 .capsule(7, 1)
                 .setCollisionGroups(0x00020005)
                 .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.DYNAMIC_DYNAMIC)
-                .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS)
+                .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS)
                 .setRestitution(0.5);
-            const collider = world.createCollider(colliderDesc, rigidBody);
+            const collider: Collider = world.createCollider(colliderDesc, rigidBody);
             mesh.userData = rigidBody;
 
             gobSprite.mesh.collider = collider;
+            gobSprite.mesh.life = 500;
 
             gobs.push(gobSprite);
             scene.add(mesh);
@@ -932,7 +1009,6 @@ loadAllLanguages().then(() => {
     let isTyping = false;
 
     const work = () => {
-        const obeyDiv: HTMLDivElement = document.getElementById('obey') as HTMLDivElement;
         obeyDiv.style.display = 'none';
         CHATTER_BOX.start('keyboard2', 0.8, 0.25);
         lastKeyEvent = performance.now();
@@ -948,27 +1024,25 @@ loadAllLanguages().then(() => {
                 difficulty: Math.random() * 10000 + 2000,
             };
 
-            const summonsDiv: HTMLDivElement = document.getElementById('summons') as HTMLDivElement;
-            summonsDiv.innerText = `Summons: ${currentDocument.documentNumber}`;
+            summonsTextDiv.innerText = `Summons: ${currentDocument.documentNumber}`;
 
             if (currentDocument.documentNumber >= documentsBeforePortal) {
-                const summonsContainerDiv: HTMLDivElement = document.getElementById('summonsDocumentContainer') as HTMLDivElement;
                 summonsContainerDiv.style.display = 'none';
                 portalMesh.visible = true;
                 playerSprite.setAnimation('falling');
 
-                const playerDocumentRigidBodyDesc = RAPIER.RigidBodyDesc
+                const playerRigidBodyDesc = RAPIER.RigidBodyDesc
                     .dynamic()
                     .setTranslation(playerMesh.position.x, playerMesh.position.y)
-                    .setLinearDamping(0.55)
+                    .setLinearDamping(0.5)
                     .setCcdEnabled(true);
-                const playerDocumentRigidBody = world.createRigidBody(playerDocumentRigidBodyDesc);
-                const playerDocumentColliderDesc = RAPIER.ColliderDesc
+                const playerRigidBody = world.createRigidBody(playerRigidBodyDesc);
+                const playerColliderDesc = RAPIER.ColliderDesc
                     .cuboid(4, 8)
-                    .setCollisionGroups(0x00010003)
+                    .setCollisionGroups(0x00010001)
                     .setRestitution(0.5);
-                const playerDocumentCollider = world.createCollider(playerDocumentColliderDesc, playerDocumentRigidBody);
-                playerMesh.userData = playerDocumentRigidBody;
+                const playerCollider = world.createCollider(playerColliderDesc, playerRigidBody);
+                playerMesh.userData = playerRigidBody;
 
                 suck = true;
             }
