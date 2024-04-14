@@ -52,10 +52,10 @@ const createBuilding = (texture, x: number, y: number, z: number): THREE.Mesh =>
 
 const loader = new THREE.TextureLoader();
 
-const loadTexture = async (name, width, height, repeatHeight) => {
+const loadTexture =  (name, width, height, repeatHeight) => {
     const texture = {
-        top: await loader.load('assets/textures/buildings/' + name + '.png'),
-        repeat: await loader.load('assets/textures/buildings/' + name + '-repeat.png'),
+        top:  loader.load('assets/textures/buildings/' + name + '.png'),
+        repeat:  loader.load('assets/textures/buildings/' + name + '-repeat.png'),
         width: width,
         height: height,
         repeatHeight: repeatHeight,
@@ -80,8 +80,8 @@ const loadTexture = async (name, width, height, repeatHeight) => {
     return texture;
 }
 
-const loadSky = async () => {
-    const skyTexture = await loader.load('assets/textures/buildings/sky.png');
+const loadSky =  () => {
+    const skyTexture =  loader.load('assets/textures/buildings/sky.png');
     skyTexture.wrapS = THREE.RepeatWrapping;
     skyTexture.repeat.set(400, 1);
 
@@ -97,8 +97,8 @@ const loadSky = async () => {
 
 }
 
-const loadPortal = async () => {
-    const portalTexture = await loader.load('assets/textures/buildings/isekaied-portal.png');
+const loadPortal =  () => {
+    const portalTexture =  loader.load('assets/textures/buildings/isekaied-portal.png');
     portalTexture.wrapS = THREE.RepeatWrapping;
     portalTexture.repeat.set(1 / 6, 1);
 
@@ -115,11 +115,11 @@ const loadPortal = async () => {
 }
 
 const textures = [
-    await loadTexture('skyline-radio', 40, 64, 22),
-    await loadTexture('skyline-skyscraper', 64, 22, 19),
+     loadTexture('skyline-radio', 40, 64, 22),
+     loadTexture('skyline-skyscraper', 64, 22, 19),
 ]
 
-const jamesonBuilding = await loadTexture('skyline-jameson', 85, 103, 48);
+const jamesonBuilding =  loadTexture('skyline-jameson', 85, 103, 48);
 
 for (let i = 0; i < 200; i++) {
     const texture = textures[Math.floor(Math.random() * textures.length)];
@@ -134,7 +134,7 @@ for (let i = 0; i < 200; i++) {
 const jamesonBuildingLastFloor = 210;
 const jamesonBuildingMesh = createBuilding(jamesonBuilding, 0, jamesonBuildingLastFloor, 0);
 
-const roomTexture = await loader.load('assets/textures/buildings/rooms.png');
+const roomTexture =  loader.load('assets/textures/buildings/rooms.png');
 const roomMaterial = new THREE.MeshBasicMaterial({ map: roomTexture, transparent: true });
 roomMaterial.map.magFilter = THREE.NearestFilter;
 roomMaterial.map.minFilter = THREE.NearestFilter;
@@ -297,9 +297,9 @@ window.addEventListener('click', (event) => {
     start = true;
 });
 
-await loadSky();
+ loadSky();
 
-const portal = await loadPortal();
+const portal =  loadPortal();
 
 portal.position.copy(roomMesh.position);
 portal.position.y -= 2;
