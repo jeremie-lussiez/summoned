@@ -100,6 +100,27 @@
 			display: none;
 		}
 
+		#progress {
+			position: absolute;
+			top: 10px;
+			right: 20px;
+			width: 256px;
+			height: 32px;
+			background-color: white;
+			z-index: 1000000;
+			display: none;
+		}
+
+		#progressChild {
+			position: absolute;
+			left: 0;
+			top: 0;
+			width: 0%;
+			height: 100%;
+			background-color: sandybrown;
+			z-index: 900000;
+		}
+
 		#summons {
 			position: absolute;
 			top: 0px;
@@ -142,6 +163,7 @@
 </audio>
 
 <body>
+	<div id="progress"><div id="progressChild"></div></div>
 	<div id="obey" class="franticRedText">Draft summons !</div>
 	<div id="summons">Summons: 0</div>
 	<div id="summonsDocumentContainer" class="debug summonsDocument">

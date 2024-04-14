@@ -14,13 +14,15 @@ const obeyDiv: HTMLDivElement = document.getElementById('obey') as HTMLDivElemen
 const summonsTextDiv: HTMLDivElement = document.getElementById('summons') as HTMLDivElement;
 const summonsDocumentTextDiv: HTMLDivElement = document.getElementById('summonsDocumentText') as HTMLDivElement;
 const summonsContainerDiv: HTMLDivElement = document.getElementById('summonsDocumentContainer') as HTMLDivElement;
+const progressDiv: HTMLDivElement = document.getElementById('progress') as HTMLDivElement;
+const progressChildDiv: HTMLDivElement = document.getElementById('progressChild') as HTMLDivElement;
 const music = document.getElementById('music');
 
 let playerHasBeenSummoned = false;
 let isFighting = false;
-let documentsBeforePortal = 23;
-const travellingSpeed = 0.005;
-const workingPower = 1000;
+let documentsBeforePortal = 42;
+const travellingSpeed = 0.0005;
+const workingPower = 800;
 const moveStrength = 60;
 const printerStrength = 100;
 let suckStrength = 10.5;
@@ -111,6 +113,19 @@ new THREE.AudioLoader().load('assets/audio/hurt.mp3', (buffer) => {
     hurtSound.setLoop(false);
     hurtSound.setVolume(0.5);
 });
+
+let printerSoundIndex = 0;
+const printerSounds: THREE.Audio[] = [];
+
+for (let i = 0; i < 10; i++) {
+    new THREE.AudioLoader().load('assets/audio/printer.mp3', (buffer) => {
+        const printerSound: THREE.Audio = new THREE.Audio(audioListener);
+        printerSound.setBuffer(buffer);
+        printerSound.setLoop(false);
+        printerSound.setVolume(0.20);
+        printerSounds.push(printerSound);
+    });
+}
 
 
 window.addEventListener('resize', () => {
@@ -425,6 +440,7 @@ function animate() {
         sceneIsReady = true;
         obeyDiv.style.display = 'block';
         summonsTextDiv.style.display = 'block';
+        progressDiv.style.display = 'block';
         buildingsMeshes.forEach((buildingMesh) => {
             buildingMesh.visible = false;
         });
@@ -728,33 +744,33 @@ const createSummonsDocument = (documentNumber: number): void => {
     const place = pickOne(summonsPlaces);
     const reason = pickOne(summonsReasons);
 
-    const summonsDocumentMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
-    const summonsDocumentMesh = new THREE.Mesh(summonsDocumentGeometry, summonsDocumentMaterial);
-    summonsDocumentMesh.position.copy(roomMesh.position);
-    summonsDocumentMesh.position.z += 0.2;
-    summonsDocumentMesh.position.x += 20;
-    summonsDocumentMesh.position.y -= 24;
-    scene.add(summonsDocumentMesh);
+    window.setTimeout(() => {
+        const summonsDocumentMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
+        const summonsDocumentMesh = new THREE.Mesh(summonsDocumentGeometry, summonsDocumentMaterial);
+        summonsDocumentMesh.position.copy(roomMesh.position);
+        summonsDocumentMesh.position.z += 0.2;
+        summonsDocumentMesh.position.x += 20;
+        summonsDocumentMesh.position.y -= 24;
+        scene.add(summonsDocumentMesh);
+        const summonsDocumentRigidBodyDesc = RAPIER.RigidBodyDesc
+            .dynamic()
+            .setTranslation(summonsDocumentMesh.position.x, summonsDocumentMesh.position.y)
+            .setLinearDamping(0.55)
+            .setCcdEnabled(true);
+        const summonsDocumentRigidBody = world.createRigidBody(summonsDocumentRigidBodyDesc);
+        const summonsDocumentColliderDesc = RAPIER.ColliderDesc
+            .cuboid(1.5, 0.5)
+            .setCollisionGroups(0x00080009)
+            .setRestitution(0.5);
+        const summonsDocumentCollider = world.createCollider(summonsDocumentColliderDesc, summonsDocumentRigidBody);
+        summonsDocumentMesh.userData = summonsDocumentRigidBody;
+        summonsDocumentMesh.collider = summonsDocumentCollider;
 
+        const printerImpulse = { x: -printerStrength, y: 10 };
+        summonsDocumentRigidBody.applyImpulse(printerImpulse, true);
 
-    const summonsDocumentRigidBodyDesc = RAPIER.RigidBodyDesc
-        .dynamic()
-        .setTranslation(summonsDocumentMesh.position.x, summonsDocumentMesh.position.y)
-        .setLinearDamping(0.55)
-        .setCcdEnabled(true);
-    const summonsDocumentRigidBody = world.createRigidBody(summonsDocumentRigidBodyDesc);
-    const summonsDocumentColliderDesc = RAPIER.ColliderDesc
-        .cuboid(1.5, 0.5)
-        .setCollisionGroups(0x00080009)
-        .setRestitution(0.5);
-    const summonsDocumentCollider = world.createCollider(summonsDocumentColliderDesc, summonsDocumentRigidBody);
-    summonsDocumentMesh.userData = summonsDocumentRigidBody;
-    summonsDocumentMesh.collider = summonsDocumentCollider;
-
-    const printerImpulse = { x: -printerStrength, y: 10 };
-    summonsDocumentRigidBody.applyImpulse(printerImpulse, true);
-
-    summonsDocuments.push(summonsDocumentMesh);
+        summonsDocuments.push(summonsDocumentMesh);
+    }, 2000);
 
     const text = `We, ${name}, hereby summon you to appear before the court on ${date} at ${time} in ${place} to answer the following charges: ${reason}. Failure to appear will result in a warrant for your arrest.`;
 
@@ -1017,6 +1033,8 @@ loadAllLanguages().then(() => {
             playerSprite.setAnimation('typing');
         }
         if (currentDocument.progression >= currentDocument.difficulty) {
+            printerSoundIndex = (printerSoundIndex + 1) % printerSounds.length;
+            printerSounds[printerSoundIndex].play();
             createSummonsDocument(currentDocument.documentNumber);
             currentDocument = {
                 progression: 0,
@@ -1025,6 +1043,10 @@ loadAllLanguages().then(() => {
             };
 
             summonsTextDiv.innerText = `Summons: ${currentDocument.documentNumber}`;
+
+            currentDocument.progression = 0;
+            currentDocument.progression = Math.min(currentDocument.progression, currentDocument.difficulty);
+            progressChildDiv.style.width = `${(currentDocument.progression / currentDocument.difficulty) * 100}%`;
 
             if (currentDocument.documentNumber >= documentsBeforePortal) {
                 summonsContainerDiv.style.display = 'none';
@@ -1048,7 +1070,9 @@ loadAllLanguages().then(() => {
             }
 
         } else {
-            currentDocument.progression += workingPower;
+            currentDocument.progression += (workingPower * Math.random() / 2) + workingPower / 2;
+            currentDocument.progression = Math.min(currentDocument.progression, currentDocument.difficulty);
+            progressChildDiv.style.width = `${(currentDocument.progression / currentDocument.difficulty) * 100}%`;
         }
     }
 
