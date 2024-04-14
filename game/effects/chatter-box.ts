@@ -1,5 +1,5 @@
 
-export const LANGUAGES = ['keyboard2'];
+export const LANGUAGES = ['keyboard2','gob'];
 
 export class ChatterBox {
     public availableVoices: Record<string, AudioBuffer> = {};
@@ -90,6 +90,7 @@ export const CHATTER_BOX = new ChatterBox();
 export const loadAllLanguages = (): Promise<string[]> => {
     const languagesToLoad = [
         CHATTER_BOX.pushLanguage('keyboard2'),
+        CHATTER_BOX.pushLanguage('gob'),
     ];
     return Promise.all(languagesToLoad);
 };

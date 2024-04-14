@@ -5,12 +5,20 @@ import { summonsReasons } from './game/lists/summons-reasons';
 import { summonsPlaces } from './game/lists/summons-places';
 import { pickOne } from './game/lists/pick-one';
 import { loadAllLanguages, CHATTER_BOX } from './game/effects/chatter-box';
+import { AnimatedSprite } from './game/animations/animated-sprite';
+import { portalAnimations } from './game/animations/portal-animations';
+import { gobAnimations } from './game/animations/gob-animations';
+import { Mesh } from 'three';
 
 let playerHasBeenSummoned = false;
+let isFighting = false;
 const documentsBeforePortal = 5;
 const travellingSpeed = 0.005;
 const workingPower = 1000;
+const moveStrength = 30;
 const printerStrength = 100;
+let suckStrength = 10.5;
+let playerSuckStrength = 250;
 
 const scene = new THREE.Scene();
 
@@ -27,6 +35,9 @@ camera.position.y = 160;
 camera.position.z = 400;
 camera.position.x = 10;
 
+const audioListener = new THREE.AudioListener();
+camera.add(audioListener);
+
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
@@ -41,10 +52,29 @@ const updateCamera = (): void => {
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
 };
 
+let summonStuffSound: THREE.Audio;
+new THREE.AudioLoader().load('/public/assets/audio/throw.mp3', (buffer) => {
+    summonStuffSound = new THREE.Audio(audioListener);
+    summonStuffSound.setBuffer(buffer);
+    summonStuffSound.setLoop(false);
+    summonStuffSound.setVolume(0.5);
+});
+
+let hurtSound: THREE.Audio;
+new THREE.AudioLoader().load('/public/assets/audio/hurt.mp3', (buffer) => {
+    hurtSound = new THREE.Audio(audioListener);
+    hurtSound.setBuffer(buffer);
+    hurtSound.setLoop(false);
+    hurtSound.setVolume(0.5);
+});
+
+
 window.addEventListener('resize', () => {
     updateCamera();
 }, false);
 
+
+const buildingsMeshes: Mesh[] = [];
 const createBuilding = (texture, x: number, y: number, z: number): THREE.Mesh => {
     const topGeometry = new THREE.PlaneGeometry(texture.width, texture.height);
     const topMesh = new THREE.Mesh(topGeometry, texture.topMaterial);
@@ -58,6 +88,7 @@ const createBuilding = (texture, x: number, y: number, z: number): THREE.Mesh =>
     repeatMesh.position.z = 0;
     topMesh.add(repeatMesh);
     scene.add(topMesh);
+    buildingsMeshes.push(topMesh);
     return topMesh;
 }
 
@@ -108,21 +139,18 @@ const loadSky = () => {
 
 }
 
-const loadPortal = () => {
-    const portalTexture = loader.load('assets/textures/buildings/isekaied-portal.png');
-    portalTexture.wrapS = THREE.RepeatWrapping;
-    portalTexture.repeat.set(1 / 6, 1);
+const loadGround = () => {
+    const texture = loader.load('assets/textures/buildings/ground.png');
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.repeat.set(400, 1);
 
-    const portalMaterial = new THREE.MeshBasicMaterial({ map: portalTexture, transparent: true });
-    portalMaterial.map.magFilter = THREE.NearestFilter;
-    portalMaterial.map.minFilter = THREE.NearestFilter;
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+    material.map.magFilter = THREE.NearestFilter;
+    material.map.minFilter = THREE.NearestFilter;
 
-    const portalGeometry = new THREE.PlaneGeometry(16, 16, 1, 1);
-    const portalMesh = new THREE.Mesh(portalGeometry, portalMaterial);
-    scene.add(portalMesh);
-
-    portalMesh.position.z = -500;
-    return portalMesh;
+    const geometry = new THREE.PlaneGeometry(32 * 400, 32, 1, 1);
+    const mesh = new THREE.Mesh(geometry, material);
+    return mesh;
 }
 
 const textures = [
@@ -188,33 +216,19 @@ backgroundPlate.position.copy(roomMesh.position);
 backgroundPlate.position.z -= 1;
 scene.add(backgroundPlate);
 
-const spriteMap = new THREE.TextureLoader().load('assets/textures/buildings/isekaied-lawyer.png');
-const spriteMaterial = new THREE.MeshBasicMaterial({ map: spriteMap, side: THREE.DoubleSide, transparent: true });
-
-const frames = 32;
-spriteMap.wrapS = THREE.ClampToEdgeWrapping;
-spriteMap.magFilter = THREE.NearestFilter;
-spriteMap.repeat.set(1 / frames, 1);
-const spriteGeometry = new THREE.PlaneGeometry(16, 16, 1, 1);
-const spriteMesh = new THREE.Mesh(spriteGeometry, spriteMaterial);
-scene.add(spriteMesh);
-spriteMesh.position.copy(roomMesh.position);
-spriteMesh.position.z += 0.01;
-spriteMesh.position.x += 3;
-spriteMesh.position.y -= 22;
-scene.add(spriteMesh);
-
-
 const animations = playerAnimations;
 
-let animation = animations['iddleLeft'];
-let animationIndex = animation.start;
-let animationStart = performance.now() + animation.speed;
-spriteMap.offset.x = animationIndex / 32;
+const playerSprite = new AnimatedSprite('/assets/textures/buildings/isekaied-lawyer.png', 16, playerAnimations);
+playerSprite.setAnimation('iddleRight');
+const playerMesh = playerSprite.mesh;
 
-let portalAnimationIndex = 0;
-let portalAnimationStart = performance.now() + 50;
+const gobs: AnimatedSprite[] = [];
 
+playerMesh.position.copy(roomMesh.position);
+playerMesh.position.z += 0.01;
+playerMesh.position.x += 3;
+playerMesh.position.y -= 22;
+scene.add(playerMesh);
 
 let start = false;
 let zoomInStart = 0;
@@ -224,14 +238,22 @@ window.addEventListener('click', (event) => {
 
 loadSky();
 
-const portal = loadPortal();
+const portalSprite = new AnimatedSprite('/assets/textures/buildings/isekaied-portal.png', 16, portalAnimations);
+const portalMesh = portalSprite.mesh;
 
-portal.position.copy(roomMesh.position);
-portal.position.y -= 2;
-portal.position.z += 0.02;
-portal.position.x += 2;
-portal.rotation.z = Math.PI * 0.5;
-portal.visible = false;
+const playerPortalSprite = new AnimatedSprite('/assets/textures/buildings/isekaied-portal.png', 8, portalAnimations);
+const playerPortalMesh = playerPortalSprite.mesh;
+playerPortalMesh.material.opacity = 0.5;
+playerPortalMesh.visible = false;
+scene.add(playerPortalMesh);
+
+portalMesh.position.copy(roomMesh.position);
+portalMesh.position.y -= 2;
+portalMesh.position.z += 0.02;
+portalMesh.position.x += 2;
+portalMesh.rotation.z = Math.PI * 0.5;
+portalMesh.visible = false;
+scene.add(portalMesh);
 
 
 const summonsDocuments: THREE.Mesh[] = [];
@@ -242,6 +264,7 @@ let suck = false;
 let lastTime = performance.now();
 let sceneIsReady = false;
 let darken = 1;
+let lastVelocityDirection = '';
 function animate() {
     requestAnimationFrame(animate);
     renderer.render(scene, camera);
@@ -261,7 +284,7 @@ function animate() {
 
     summonsDocuments.forEach((summonsDocument) => {
         // summonsDocument.position.x -= 0.1;
-        const distanceToPortal = portal.position.distanceTo(summonsDocument.position);
+        const distanceToPortal = portalMesh.position.distanceTo(summonsDocument.position);
         if (distanceToPortal < 10) {
             summonsDocument.material.opacity = 1 - distanceToPortal / 10;
         } else {
@@ -290,41 +313,44 @@ function animate() {
         }
     });
 
-    if (suck && spriteMesh.userData) {
-        spriteMesh.position.y = spriteMesh.userData.translation().y;
-        spriteMesh.position.x = spriteMesh.userData.translation().x;
-        spriteMesh.rotation.z = spriteMesh.userData.rotation();
-        const distanceToPortal = portal.position.distanceTo(spriteMesh.position) - 8;
-        if (distanceToPortal < 5) {
-            spriteMesh.material.opacity = distanceToPortal / 5;
-        } else {
-            spriteMesh.material.opacity = 1;
+    if (playerMesh.userData) {
+        if (suck && !isFighting) {
+            playerMesh.position.y = playerMesh.userData.translation().y;
+            playerMesh.position.x = playerMesh.userData.translation().x;
+            playerMesh.rotation.z = playerMesh.userData.rotation();
+            const distanceToPortal = portalMesh.position.distanceTo(playerMesh.position) - 8;
+            if (distanceToPortal < 5) {
+                playerMesh.material.opacity = distanceToPortal / 5;
+            } else {
+                playerMesh.material.opacity = 1;
+            }
+        } else if (isFighting) {
+            playerMesh.position.y = playerMesh.userData.translation().y;
+            playerMesh.position.x = playerMesh.userData.translation().x;
+            playerMesh.rotation.z = playerMesh.userData.rotation();
+            playerMesh.material.opacity = 1;
         }
     }
 
-    if (portalAnimationStart < now) {
-        portalAnimationIndex += 1;
-        if (portalAnimationIndex > 6) {
-            portalAnimationIndex = 0;
-        }
-        portalAnimationStart = now + 50;
-        portal.material.map.offset.x = portalAnimationIndex / 5.9999;
-    }
+    portalSprite.update(now);
+    playerSprite.update(now);
+    playerPortalSprite.update(now);
 
-    if (animationStart < now) {
-        animationIndex += 1;
-        if (animationIndex > animation.end) {
-            animationIndex = animation.start;
+    gobs.forEach((gob) => {
+        gob.update(now);
+        const currentGobMesh = gob.mesh;
+        if (currentGobMesh.userData) {
+            currentGobMesh.position.y = currentGobMesh.userData.translation().y;
+            currentGobMesh.position.x = currentGobMesh.userData.translation().x;
+            currentGobMesh.rotation.z = currentGobMesh.userData.rotation();
         }
-        animationStart = now + animation.speed;
-        spriteMap.offset.x = animationIndex / 32;
-    }
+    });
 
     if (!start) {
         zoomInStart = now;
     }
 
-    if (camera.position.z > 1.8) {
+    if (camera.position.z > 1.8 && !isFighting && !playerHasBeenSummoned) {
         camera.position.z = (Math.cos((now - zoomInStart) * travellingSpeed) * 250 + 250) - 1;
         const distance = camera.position.z;
         const opacityDistanceThreshold = 80;
@@ -346,15 +372,72 @@ function animate() {
         obeyDiv.style.display = 'block';
         const summonsDiv: HTMLDivElement = document.getElementById('summons') as HTMLDivElement;
         summonsDiv.style.display = 'block';
+        buildingsMeshes.forEach((buildingMesh) => {
+            buildingMesh.visible = false;
+        });
     }
 
     bigHandPivot.rotation.z -= delta * 0.0002;
     smallHandPivot.rotation.z -= delta * 0.0002 / (Math.PI * 4);
 
+    if (isFighting) {
+        camera.position.x = playerMesh.position.x;
+        camera.position.y = playerMesh.position.y + 10;
+
+        if (playerMesh.userData) {
+            const body = playerMesh.userData;
+            const velocity = body.linvel();
+            if (Math.abs(velocity.x) < 0.01) {
+                playerSprite.setAnimation('iddle' + lastVelocityDirection);
+            } else {
+                const direction: string = velocity.x > 0 ? 'Right' : 'Left';
+                if (lastVelocityDirection !== direction) {
+                    playerSprite.setAnimation('walking' + direction);
+                    lastVelocityDirection = direction;
+                }
+            }
+        }
+
+    }
+
 }
 animate();
 
 let world;
+
+const groundMesh = loadGround();
+groundMesh.position.copy(roomMesh.position);
+groundMesh.position.z -= 0.01;
+groundMesh.position.y -= 46;
+groundMesh.visible = false;
+scene.add(groundMesh);
+
+let leftWallCollider;
+let rightWallCollider;
+let ceilingCollider;
+
+let isRight = false;
+let isLeft = false;
+let isUp = false;
+let isDown = false;
+
+window.addEventListener('keydown', (event) => {
+    isUp = event.key === 'ArrowUp' ? true : isUp;
+    isDown = event.key === 'ArrowDown' ? true : isDown;
+    isLeft = event.key === 'ArrowLeft' ? true : isLeft;
+    isRight = event.key === 'ArrowRight' ? true : isRight;
+});
+
+window.addEventListener('keyup', (event) => {
+    isUp = event.key === 'ArrowUp' ? false : isUp;
+    isDown = event.key === 'ArrowDown' ? false : isDown;
+    isLeft = event.key === 'ArrowLeft' ? false : isLeft;
+    isRight = event.key === 'ArrowRight' ? false : isRight;
+});
+
+window.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+});
 
 RAPIER.init().then(() => {
 
@@ -379,9 +462,9 @@ RAPIER.init().then(() => {
         .setCcdEnabled(true);
     const groundRigidBody = world.createRigidBody(groundRigidBodyDesc);
     const groundColliderDesc = RAPIER.ColliderDesc
-        .cuboid(60, 2)
-        .setRestitution(0.4)
-        .setActiveEvents(ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS);
+        .cuboid(1000, 2)
+        .setCollisionGroups(0x00010007)
+        .setRestitution(0.4);
     const groundCollider = world.createCollider(groundColliderDesc, groundRigidBody);
 
     const ceilingRigidBodyDesc = RAPIER.RigidBodyDesc
@@ -392,9 +475,9 @@ RAPIER.init().then(() => {
     const ceilingRigidBody = world.createRigidBody(ceilingRigidBodyDesc);
     const ceilingColliderDesc = RAPIER.ColliderDesc
         .cuboid(60, 2)
-        .setRestitution(0.4)
-        .setActiveEvents(ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS);
-    const ceilingCollider = world.createCollider(ceilingColliderDesc, ceilingRigidBody);
+        .setCollisionGroups(0x00010007)
+        .setRestitution(0.4);
+    ceilingCollider = world.createCollider(ceilingColliderDesc, ceilingRigidBody);
 
     const leftWallRigidBodyDesc = RAPIER.RigidBodyDesc
         .fixed()
@@ -404,9 +487,9 @@ RAPIER.init().then(() => {
     const leftWallRigidBody = world.createRigidBody(leftWallRigidBodyDesc);
     const leftWallColliderDesc = RAPIER.ColliderDesc
         .cuboid(2, 60)
-        .setRestitution(0.4)
-        .setActiveEvents(ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS);
-    const leftWallCollider = world.createCollider(leftWallColliderDesc, leftWallRigidBody);
+        .setCollisionGroups(0x00010007)
+        .setRestitution(0.4);
+    leftWallCollider = world.createCollider(leftWallColliderDesc, leftWallRigidBody);
 
     const rightWallRigidBodyDesc = RAPIER.RigidBodyDesc
         .fixed()
@@ -416,9 +499,9 @@ RAPIER.init().then(() => {
     const rightWallRigidBody = world.createRigidBody(rightWallRigidBodyDesc);
     const rightWallColliderDesc = RAPIER.ColliderDesc
         .cuboid(2, 60)
-        .setRestitution(0.4)
-        .setActiveEvents(ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS);
-    const rightWallCollider = world.createCollider(rightWallColliderDesc, rightWallRigidBody);
+        .setCollisionGroups(0x00010007)
+        .setRestitution(0.4);
+    rightWallCollider = world.createCollider(rightWallColliderDesc, rightWallRigidBody);
 
     let lastPhysicsTime = performance.now();
     const timeScale = 1.0;
@@ -432,10 +515,9 @@ RAPIER.init().then(() => {
             summonsDocuments.forEach((mesh) => {
                 if (mesh.userData) {
                     const body = mesh.userData;
-                    const suckStrength = 1.5;
                     let suckAngle = Math.atan2(
-                        portal.position.y - body.translation().y,
-                        portal.position.x - body.translation().x
+                        portalMesh.position.y - body.translation().y,
+                        portalMesh.position.x - body.translation().x
                     );
                     let suckForce = {
                         x: Math.cos(suckAngle) * suckStrength,
@@ -443,8 +525,8 @@ RAPIER.init().then(() => {
                     };
                     body.applyImpulse(suckForce, true);
                     let distance = Math.sqrt(
-                        Math.pow(portal.position.x - body.translation().x, 2) +
-                        Math.pow(portal.position.y - body.translation().y, 2)
+                        Math.pow(portalMesh.position.x - body.translation().x, 2) +
+                        Math.pow(portalMesh.position.y - body.translation().y, 2)
                     );
                     if (distance < 3) {
                         world.removeRigidBody(body);
@@ -453,29 +535,32 @@ RAPIER.init().then(() => {
                 }
             });
 
-            if (spriteMesh.userData) {
-                const body = spriteMesh.userData;
-                const suckStrength = 25.5;
+            if (playerMesh.userData && !isFighting) {
+                const body = playerMesh.userData;
                 let suckAngle = Math.atan2(
-                    portal.position.y - body.translation().y,
-                    portal.position.x - body.translation().x
+                    portalMesh.position.y - body.translation().y,
+                    portalMesh.position.x - body.translation().x
                 );
                 let suckForce = {
-                    x: Math.cos(suckAngle) * suckStrength,
-                    y: Math.sin(suckAngle) * suckStrength
+                    x: Math.cos(suckAngle) * playerSuckStrength,
+                    y: Math.sin(suckAngle) * playerSuckStrength
                 };
                 let distance = Math.sqrt(
-                    Math.pow(portal.position.x - body.translation().x, 2) +
-                    Math.pow(portal.position.y - body.translation().y, 2)
+                    Math.pow(portalMesh.position.x - body.translation().x, 2) +
+                    Math.pow(portalMesh.position.y - body.translation().y, 2)
                 ) - 8;
                 if (distance < 0) {
                     // world.removeRigidBody(body);
                     playerHasBeenSummoned = true;
-                    spriteMesh.userData = null;
-                    console.log('Player has been summoned');
+                    // playerMesh.userData = null;
                     const obeyDiv: HTMLDivElement = document.getElementById('obey') as HTMLDivElement;
                     obeyDiv.style.display = 'block';
                     obeyDiv.innerText = 'YOU have been summoned !';
+                    // backgroundPlate.material.opacity = 0;
+                    smallHandMesh.visible = false;
+                    bigHandMesh.visible = false;
+                    const summonsDiv: HTMLDivElement = document.getElementById('summons') as HTMLDivElement;
+                    summonsDiv.style.display = 'none';
                 }
                 if (body) {
                     body.applyImpulse(suckForce, true);
@@ -484,7 +569,74 @@ RAPIER.init().then(() => {
 
         }
 
+        gobs.forEach((gob) => {
+            if (gob.mesh.userData) {
+                const body = gob.mesh.userData;
+                if (!gob.mesh.isDead) {
+                    if (Math.random() < 0.05) {
+                        const strength = 400;
+                        body.applyImpulse({ x: Math.random() * strength - strength / 2, y: Math.random() * strength - strength / 2 }, true);
+                    }
+                    body.setRotation(0, true);
+                }
+            }
+        });
+
+        if (isFighting) {
+
+            if (playerMesh.userData) {
+                const body = playerMesh.userData;
+                if (isRight) {
+                    body.applyImpulse({ x: moveStrength, y: 0 }, true);
+                }
+                if (isLeft) {
+                    body.applyImpulse({ x: -moveStrength, y: 0 }, true);
+                }
+                if (isUp) {
+                    body.applyImpulse({ x: 0, y: moveStrength * 2 }, true);
+                }
+            }
+
+            playerMesh.userData.setRotation(0, true);
+        }
+
         world.step(eventQueue);
+
+        eventQueue.drainContactForceEvents((event) => {
+            
+            let handle1 = event.collider1();
+            let handle2 = event.collider2();
+
+            if (handle1) {
+                const gob = gobs.find((gob) => {
+                    if (gob.mesh.userData && gob.mesh.collider.handle === handle1) {
+                        return true;
+                    }
+                });
+                if (gob && !gob.mesh.isDead) {
+                    console.log('Collision event 1', handle1, event.totalForceMagnitude());
+                    gob.mesh.isDead = true;
+                    gob.setAnimation('dead');
+                    hurtSound.play();
+                }
+            }
+
+            if (handle2) {
+                const gob = gobs.find((gob) => {
+                    if (gob.mesh.userData && gob.mesh.collider.handle === handle2) {
+                        return true;
+                    }
+                });
+                if (gob && !gob.mesh.isDead) {
+                    console.log('Collision event 2', hhandle2, event.totalForceMagnitude());
+                    gob.mesh.isDead = true;
+                    gob.setAnimation('dead');
+                    hurtSound.play();
+                }
+            }
+
+        });
+
         setTimeout(gameLoop, 1000 / 60);
     };
 
@@ -516,8 +668,8 @@ const createSummonsDocument = (documentNumber: number): void => {
     const summonsDocumentRigidBody = world.createRigidBody(summonsDocumentRigidBodyDesc);
     const summonsDocumentColliderDesc = RAPIER.ColliderDesc
         .cuboid(1.5, 0.5)
-        .setRestitution(0.5)
-        .setActiveEvents(ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS);
+        .setCollisionGroups(0x00010001)
+        .setRestitution(0.5);
     const summonsDocumentCollider = world.createCollider(summonsDocumentColliderDesc, summonsDocumentRigidBody);
     summonsDocumentMesh.userData = summonsDocumentRigidBody;
 
@@ -543,21 +695,8 @@ let currentDocument = {
 
 mousePlane.position.z = roomMesh.position.z;
 
-const geometry = new THREE.BoxGeometry(1, 1, 1);
-const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-const cube = new THREE.Mesh(geometry, material);
-cube.position.copy(mousePlane.position);
-scene.add(cube);
-
-const geometry2 = new THREE.BoxGeometry(1, 1, 1);
-const material2 = new THREE.MeshBasicMaterial({ color: 0xff8800 });
-const cube2 = new THREE.Mesh(geometry2, material2);
-cube2.position.copy(mousePlane.position);
-scene.add(cube2);
-
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
-
 
 const stuffDefinitions = [
     {
@@ -643,8 +782,8 @@ const summonStuff = (x: number, y: number, z: number, force: number, angle: numb
     const stuffRigidBody = world.createRigidBody(stuffRigidBodyDesc);
     const stuffColliderDesc = RAPIER.ColliderDesc
         .cuboid(definition.width / 2, definition.height / 2)
-        .setRestitution(0.5)
-        .setActiveEvents(ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS);
+        .setCollisionGroups(0x00040003)
+        .setRestitution(0.5);
     const stuffCollider = world.createCollider(stuffColliderDesc, stuffRigidBody);
     stuffMesh.userData = stuffRigidBody;
 
@@ -653,14 +792,86 @@ const summonStuff = (x: number, y: number, z: number, force: number, angle: numb
 
     scene.add(stuffMesh);
 
+    summonStuffSound.play();
+
     summonedThings.push(stuffMesh);
 
 }
 
-let isFighting = false;
-
+let backgroundFade = 1;
+let fadeIntervalId = 0;
 addEventListener('click', (event) => {
+
+    const obeyDiv: HTMLDivElement = document.getElementById('obey') as HTMLDivElement;
+
+    if (playerHasBeenSummoned && !isFighting) {
+        // isFighting = true;
+        // playerSprite.setAnimation('knightSlashingRight');
+        // setTimeout(() => {
+        //     isFighting = false;
+        //     playerSprite.setAnimation('knightSlashingLeft');
+        // }, 1000);
+        obeyDiv.style.display = 'none';
+
+        groundMesh.visible = true;
+
+        const cameraTarget = camera.position.z + 20;
+
+        // 0x00010007
+        leftWallCollider.setCollisionGroups(0x00000000);
+        rightWallCollider.setCollisionGroups(0x00000000);
+        ceilingCollider.setCollisionGroups(0x00000000);
+
+        for (let g = 0; g < 5; g++) {
+            const gobSprite = new AnimatedSprite('/assets/textures/buildings/isekaied-gob.png', 16, gobAnimations);
+            gobSprite.randomAnimation();
+            const mesh = gobSprite.mesh;
+            mesh.position.copy(playerMesh.position);
+            mesh.position.z -= 0.01
+            mesh.position.x += Math.random() * 50 - 25;
+
+            const rigidBodyDesc = RAPIER.RigidBodyDesc
+                .dynamic()
+                .setTranslation(mesh.position.x, mesh.position.y)
+                .setLinearDamping(0.55)
+                .setCcdEnabled(true);
+            const rigidBody = world.createRigidBody(rigidBodyDesc);
+            const colliderDesc = RAPIER.ColliderDesc
+                .capsule(7, 1)
+                .setCollisionGroups(0x00020005)
+                .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.DYNAMIC_DYNAMIC)
+                .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS)
+                .setRestitution(0.5);
+            const collider = world.createCollider(colliderDesc, rigidBody);
+            mesh.userData = rigidBody;
+
+            gobSprite.mesh.collider = collider;
+
+            gobs.push(gobSprite);
+            scene.add(mesh);
+        }
+
+        fadeIntervalId = window.setInterval(() => {
+            if (backgroundFade > 0) {
+                backgroundFade -= 0.01;
+                backgroundFade = Math.max(0, backgroundFade);
+                backgroundPlate.material.opacity = backgroundFade;
+                camera.position.z += 0.01 * 20;
+            } else {
+
+                obeyDiv.style.display = 'block';
+                obeyDiv.innerText = 'Use your summoning experience to defeat the goblins !';
+                isFighting = true;
+                camera.position.z = cameraTarget;
+                clearInterval(fadeIntervalId);
+            }
+        }, 20);
+
+    }
+
     if (isFighting) {
+
+        obeyDiv.style.display = 'none';
 
         pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
         pointer.y = - (event.clientY / window.innerHeight) * 2 + 1;
@@ -672,16 +883,21 @@ addEventListener('click', (event) => {
         const xPos = intersects[0].point.x;
         const yPos = intersects[0].point.y;
 
-        const distanceToSprite = Math.sqrt(Math.pow(spriteMesh.position.x - xPos, 2) + Math.pow(spriteMesh.position.y - yPos, 2));
+        const distanceToSprite = Math.sqrt(Math.pow(playerMesh.position.x - xPos, 2) + Math.pow(playerMesh.position.y - yPos, 2));
 
-        console.log('distance:', distanceToSprite, xPos, yPos);
+        const angle = Math.atan2(yPos - playerMesh.position.y, xPos - playerMesh.position.x);
 
-        const angle = Math.atan2(yPos - spriteMesh.position.y, xPos - spriteMesh.position.x);
+        playerPortalMesh.visible = true;
 
-        cube2.position.x = spriteMesh.position.x + Math.cos(angle) * 8;
-        cube2.position.y = spriteMesh.position.y + Math.sin(angle) * 8;
+        playerPortalMesh.position.z = playerMesh.position.z;
+        playerPortalMesh.position.x = playerMesh.position.x + Math.cos(angle) * 8;
+        playerPortalMesh.position.y = playerMesh.position.y + Math.sin(angle) * 8;
 
-        summonStuff(cube2.position.x, cube2.position.y, spriteMesh.position.z + 0.01, distanceToSprite * 20 + 5, angle);
+        summonStuff(playerPortalMesh.position.x, playerPortalMesh.position.y, playerMesh.position.z + 0.01, distanceToSprite * 20 + 5, angle);
+
+        window.setTimeout(() => {
+            playerPortalMesh.visible = false;
+        }, 200);
     }
 
 });
@@ -700,10 +916,11 @@ window.addEventListener('mousemove', (event) => {
         const xPos = intersects[0].point.x;
         const yPos = intersects[0].point.y;
 
-        const angle = Math.atan2(yPos - spriteMesh.position.y, xPos - spriteMesh.position.x);
+        const angle = Math.atan2(yPos - playerMesh.position.y, xPos - playerMesh.position.x);
 
-        cube.position.x = spriteMesh.position.x + Math.cos(angle) * 8;
-        cube.position.y = spriteMesh.position.y + Math.sin(angle) * 8;
+        playerPortalMesh.position.z = playerMesh.position.z;
+        playerPortalMesh.position.x = playerMesh.position.x + Math.cos(angle) * 8;
+        playerPortalMesh.position.y = playerMesh.position.y + Math.sin(angle) * 8;
     }
 
 });
@@ -721,10 +938,7 @@ loadAllLanguages().then(() => {
         lastKeyEvent = performance.now();
         if (!isTyping) {
             isTyping = true;
-            animation = animations['typing'];
-            animationIndex = animation.start;
-            animationStart = performance.now() + animation.speed;
-            spriteMap.offset.x = animationIndex / 32;
+            playerSprite.setAnimation('typing');
         }
         if (currentDocument.progression >= currentDocument.difficulty) {
             createSummonsDocument(currentDocument.documentNumber);
@@ -740,24 +954,21 @@ loadAllLanguages().then(() => {
             if (currentDocument.documentNumber >= documentsBeforePortal) {
                 const summonsContainerDiv: HTMLDivElement = document.getElementById('summonsDocumentContainer') as HTMLDivElement;
                 summonsContainerDiv.style.display = 'none';
-                portal.visible = true;
-                animation = animations['falling'];
-                animationIndex = animation.start;
-                animationStart = performance.now() + animation.speed;
-                spriteMap.offset.x = animationIndex / 32;
+                portalMesh.visible = true;
+                playerSprite.setAnimation('falling');
 
                 const playerDocumentRigidBodyDesc = RAPIER.RigidBodyDesc
                     .dynamic()
-                    .setTranslation(spriteMesh.position.x, spriteMesh.position.y)
+                    .setTranslation(playerMesh.position.x, playerMesh.position.y)
                     .setLinearDamping(0.55)
                     .setCcdEnabled(true);
                 const playerDocumentRigidBody = world.createRigidBody(playerDocumentRigidBodyDesc);
                 const playerDocumentColliderDesc = RAPIER.ColliderDesc
                     .cuboid(4, 8)
-                    .setRestitution(0.5)
-                    .setActiveEvents(ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS);
+                    .setCollisionGroups(0x00010003)
+                    .setRestitution(0.5);
                 const playerDocumentCollider = world.createCollider(playerDocumentColliderDesc, playerDocumentRigidBody);
-                spriteMesh.userData = playerDocumentRigidBody;
+                playerMesh.userData = playerDocumentRigidBody;
 
                 suck = true;
             }
@@ -772,23 +983,20 @@ loadAllLanguages().then(() => {
         if (isTyping && now - lastKeyEvent > toleratedDelay) {
             isTyping = false;
             CHATTER_BOX.stop();
-            animation = animations['sitting'];
-            animationIndex = animation.start;
-            animationStart = performance.now() + animation.speed;
-            spriteMap.offset.x = animationIndex / 32;
+            playerSprite.setAnimation('sitting');
         }
     };
 
     let lastKey = '';
     window.addEventListener('keydown', (event) => {
-        if (event.key !== lastKey && sceneIsReady && portal.visible === false) {
+        if (event.key !== lastKey && sceneIsReady && portalMesh.visible === false) {
             work();
             lastKey = event.key;
         }
     });
 
     window.setInterval(() => {
-        if (portal.visible === false) {
+        if (portalMesh.visible === false) {
             procrastinate();
         } else {
             CHATTER_BOX.stop();

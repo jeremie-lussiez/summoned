@@ -56,10 +56,20 @@ export const playerAnimations: Record<string, SpriteAnimation> = {
         end: 16,
         speed: 150,
     },
+    'knightIddleRight': {
+        start: 17,
+        end: 17,
+        speed: 200000,
+    },
     'knightWalkingRight': {
         start: 17,
         end: 19,
         speed: 200,
+    },
+    'knightIddleLeft': {
+        start: 20,
+        end: 20,
+        speed: 200000,
     },
     'knightWalkingLeft': {
         start: 20,

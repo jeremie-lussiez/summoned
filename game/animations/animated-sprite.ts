@@ -8,7 +8,7 @@ export class AnimatedSprite {
     private frames: number;
     private animationIndex: number;
     private animationStart: number;
-    private mesh: Mesh;
+    public mesh: Mesh;
     private texture: Texture;
     private size: number;
 
@@ -21,7 +21,7 @@ export class AnimatedSprite {
         this.texture = new TextureLoader().load(path);
         const spriteMaterial = new MeshBasicMaterial({ map: this.texture, side: DoubleSide, transparent: true });
         this.size = size;
-        this.frames = Object.values(this.animations).length;
+        this.frames = Object.values(this.animations).map(animation => animation.end).reduce((a, b) => Math.max(a, b)) + 1;
         this.texture.wrapS = ClampToEdgeWrapping;
         this.texture.magFilter = NearestFilter;
         this.texture.repeat.set(1 / this.frames, 1);
@@ -30,11 +30,20 @@ export class AnimatedSprite {
         this.mesh = new Mesh(spriteGeometry, spriteMaterial);
     }
 
+    public randomAnimation() {
+        const animations = Object.keys(this.animations);
+        const animationId = animations[Math.floor(Math.random() * animations.length)];
+        this.setAnimation(animationId);
+    }
+
     public setAnimation(animationId: string) {
-        this.currentAnimation = this.animations[animationId];
-        this.animationIndex = this.currentAnimation.start;
-        this.animationStart = performance.now() + this.currentAnimation.speed;
-        this.texture.offset.x = this.animationIndex / this.frames;
+        const newAnimation = this.animations[animationId];
+        if (newAnimation) {
+            this.currentAnimation = newAnimation;
+            this.animationIndex = this.currentAnimation.start;
+            this.animationStart = performance.now() + this.currentAnimation.speed;
+            this.texture.offset.x = this.animationIndex / this.frames;
+        }
     }
 
     public update(time: number) {
