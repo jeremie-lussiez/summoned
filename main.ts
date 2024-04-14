@@ -745,7 +745,7 @@ const createSummonsDocument = (documentNumber: number): void => {
     const summonsDocumentRigidBody = world.createRigidBody(summonsDocumentRigidBodyDesc);
     const summonsDocumentColliderDesc = RAPIER.ColliderDesc
         .cuboid(1.5, 0.5)
-        .setCollisionGroups(0x00080001)
+        .setCollisionGroups(0x00080009)
         .setRestitution(0.5);
     const summonsDocumentCollider = world.createCollider(summonsDocumentColliderDesc, summonsDocumentRigidBody);
     summonsDocumentMesh.userData = summonsDocumentRigidBody;
