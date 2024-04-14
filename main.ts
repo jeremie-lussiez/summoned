@@ -97,7 +97,7 @@ const updateCamera = (): void => {
 };
 
 let summonStuffSound: THREE.Audio;
-new THREE.AudioLoader().load('/public/assets/audio/throw.mp3', (buffer) => {
+new THREE.AudioLoader().load('assets/audio/throw.mp3', (buffer) => {
     summonStuffSound = new THREE.Audio(audioListener);
     summonStuffSound.setBuffer(buffer);
     summonStuffSound.setLoop(false);
@@ -105,7 +105,7 @@ new THREE.AudioLoader().load('/public/assets/audio/throw.mp3', (buffer) => {
 });
 
 let hurtSound: THREE.Audio;
-new THREE.AudioLoader().load('/public/assets/audio/hurt.mp3', (buffer) => {
+new THREE.AudioLoader().load('assets/audio/hurt.mp3', (buffer) => {
     hurtSound = new THREE.Audio(audioListener);
     hurtSound.setBuffer(buffer);
     hurtSound.setLoop(false);
@@ -262,7 +262,7 @@ scene.add(backgroundPlate);
 
 const animations = playerAnimations;
 
-const playerSprite = new AnimatedSprite('/assets/textures/buildings/isekaied-lawyer.png', 16, playerAnimations);
+const playerSprite = new AnimatedSprite('assets/textures/buildings/isekaied-lawyer.png', 16, playerAnimations);
 playerSprite.setAnimation('iddleRight');
 const playerMesh = playerSprite.mesh;
 
@@ -282,10 +282,10 @@ window.addEventListener('click', (event) => {
 
 loadSky();
 
-const portalSprite = new AnimatedSprite('/assets/textures/buildings/isekaied-portal.png', 16, portalAnimations);
+const portalSprite = new AnimatedSprite('assets/textures/buildings/isekaied-portal.png', 16, portalAnimations);
 const portalMesh = portalSprite.mesh;
 
-const playerPortalSprite = new AnimatedSprite('/assets/textures/buildings/isekaied-portal.png', 8, portalAnimations);
+const playerPortalSprite = new AnimatedSprite('assets/textures/buildings/isekaied-portal.png', 8, portalAnimations);
 const playerPortalMesh = playerPortalSprite.mesh;
 playerPortalMesh.material.opacity = 0.5;
 playerPortalMesh.visible = false;
@@ -899,7 +899,7 @@ addEventListener('click', (event) => {
         ceilingCollider.setCollisionGroups(0x00000000);
 
         for (let g = 0; g < currentDocument.documentNumber; g++) {
-            const gobSprite = new AnimatedSprite('/assets/textures/buildings/isekaied-gob.png', 16, gobAnimations);
+            const gobSprite = new AnimatedSprite('assets/textures/buildings/isekaied-gob.png', 16, gobAnimations);
             gobSprite.randomAnimation();
             const mesh = gobSprite.mesh;
             mesh.position.copy(playerMesh.position);

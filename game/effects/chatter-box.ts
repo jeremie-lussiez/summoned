@@ -75,7 +75,7 @@ export class ChatterBox {
 
     pushLanguage(voiceName: string): Promise<string> {
         const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        return fetch(`/assets/audio/${voiceName}.mp3`)
+        return fetch(`assets/audio/${voiceName}.mp3`)
             .then((response) => response.arrayBuffer())
             .then((buffer) => audioCtx.decodeAudioData(buffer))
             .then((buffer) => {
