@@ -7,6 +7,7 @@ let playerHasBeenSummoned = false;
 const documentsBeforePortal = 50;
 const travellingSpeed = 0.0005;
 const workingPower = 1000;
+const printerStrength = 100;
 
 const scene = new THREE.Scene();
 
@@ -605,7 +606,7 @@ const createSummonsDocument = (documentNumber: number): string => {
     const summonsDocumentCollider = world.createCollider(summonsDocumentColliderDesc, summonsDocumentRigidBody);
     summonsDocumentMesh.userData = summonsDocumentRigidBody;
 
-    const printerImpulse = { x: -50, y: 0 };
+    const printerImpulse = { x: -printerStrength, y: 10 };
     summonsDocumentRigidBody.applyImpulse(printerImpulse, true);
 
     summonsDocuments.push(summonsDocumentMesh);
