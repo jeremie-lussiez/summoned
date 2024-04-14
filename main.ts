@@ -2,6 +2,12 @@ import * as THREE from 'three';
 import { CHATTER_BOX, loadAllLanguages } from './game/lib/effects/chatter-box';
 import RAPIER, { ActiveEvents } from '@dimforge/rapier2d-compat';
 
+let playerHasBeenSummoned = false;
+
+const documentsBeforePortal = 50;
+const travellingSpeed = 0.0005;
+const workingPower = 1000;
+
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
@@ -137,8 +143,6 @@ roomMesh.position.x = 9;
 roomMesh.position.y = jamesonBuildingLastFloor - 34;
 roomMesh.position.z = -20;
 scene.add(roomMesh);
-
-
 
 const smallHandMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
 const smallHandGeometry = new THREE.PlaneGeometry(1, 2, 1, 1);
@@ -297,16 +301,17 @@ await loadSky();
 const portal = await loadPortal();
 
 portal.position.copy(roomMesh.position);
-portal.position.y -= 8;
+portal.position.y -= 2;
 portal.position.z += 0.02;
+portal.position.x += 2;
 portal.rotation.z = Math.PI * 0.5;
 portal.visible = false;
 
 
 const summonsDocuments: THREE.Mesh[] = [];
-const summonsDocumentMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
 const summonsDocumentGeometry = new THREE.PlaneGeometry(3, 1, 1, 1);
 
+let suck = false;
 let lastTime = performance.now();
 let sceneIsReady = false;
 function animate() {
@@ -323,14 +328,38 @@ function animate() {
 
     summonsDocuments.forEach((summonsDocument) => {
         // summonsDocument.position.x -= 0.1;
-        summonsDocument.position.y = summonsDocument.userData.translation().y;
-        summonsDocument.position.x = summonsDocument.userData.translation().x;
-        summonsDocument.rotation.z = summonsDocument.userData.rotation();
+        const distanceToPortal = portal.position.distanceTo(summonsDocument.position);
+        if (distanceToPortal < 10) {
+            summonsDocument.material.opacity = 1 - distanceToPortal / 10;
+        } else {
+            summonsDocument.material.opacity = 1;
+        }
+        if (distanceToPortal < 3) {
+            // scene.remove(summonsDocument);
+            summonsDocument.visible = false;
+        }
+        if (summonsDocument.userData) {
+            summonsDocument.position.y = summonsDocument.userData.translation().y;
+            summonsDocument.position.x = summonsDocument.userData.translation().x;
+            summonsDocument.rotation.z = summonsDocument.userData.rotation();
+        }
         // summonsDocument.material.opacity -= 0.01;
         // if (summonsDocument.material.opacity <= 0) {
         //     scene.remove(summonsDocument);
         // }
     });
+
+    if (suck && spriteMesh.userData) {
+        spriteMesh.position.y = spriteMesh.userData.translation().y;
+        spriteMesh.position.x = spriteMesh.userData.translation().x;
+        spriteMesh.rotation.z = spriteMesh.userData.rotation();
+        const distanceToPortal = portal.position.distanceTo(spriteMesh.position) - 8;
+        if (distanceToPortal < 5) {
+            spriteMesh.material.opacity = distanceToPortal / 5;
+        } else {
+            spriteMesh.material.opacity = 1;
+        }
+    }
 
     if (portalAnimationStart < now) {
         portalAnimationIndex += 1;
@@ -354,8 +383,8 @@ function animate() {
         zoomInStart = now;
     }
 
-    if (camera.position.z > 0) {
-        camera.position.z = (Math.cos((now - zoomInStart) * 0.0005) * 250 + 250) - 1;
+    if (camera.position.z > 1.8) {
+        camera.position.z = (Math.cos((now - zoomInStart) * travellingSpeed) * 250 + 250) - 1;
         const distance = camera.position.z;
         const opacityDistanceThreshold = 80;
         if (distance < opacityDistanceThreshold) {
@@ -371,6 +400,8 @@ function animate() {
         sceneIsReady = true;
         const obeyDiv: HTMLDivElement = document.getElementById('obey') as HTMLDivElement;
         obeyDiv.style.display = 'block';
+        const summonsDiv: HTMLDivElement = document.getElementById('summons') as HTMLDivElement;
+        summonsDiv.style.display = 'block';
     }
 
     bigHandPivot.rotation.z -= delta * 0.0002;
@@ -410,8 +441,6 @@ const places = [
 let world;
 
 RAPIER.init().then(() => {
-
-    console.log("Worker loaded");
 
     let eventQueue = new RAPIER.EventQueue(true);
 
@@ -482,6 +511,63 @@ RAPIER.init().then(() => {
         const currentTime = performance.now();
         world.timestep = (currentTime - lastPhysicsTime) / 1000.0 * timeScale;
         lastPhysicsTime = currentTime;
+
+        if (suck) {
+            summonsDocuments.forEach((mesh) => {
+                if (mesh.userData) {
+                    const body = mesh.userData;
+                    const suckStrength = 1.5;
+                    let suckAngle = Math.atan2(
+                        portal.position.y - body.translation().y,
+                        portal.position.x - body.translation().x
+                    );
+                    let suckForce = {
+                        x: Math.cos(suckAngle) * suckStrength,
+                        y: Math.sin(suckAngle) * suckStrength
+                    };
+                    body.applyImpulse(suckForce, true);
+                    let distance = Math.sqrt(
+                        Math.pow(portal.position.x - body.translation().x, 2) +
+                        Math.pow(portal.position.y - body.translation().y, 2)
+                    );
+                    if (distance < 3) {
+                        world.removeRigidBody(body);
+                        mesh.userData = null;
+                    }
+                }
+            });
+
+            if (spriteMesh.userData) {
+                const body = spriteMesh.userData;
+                const suckStrength = 25.5;
+                let suckAngle = Math.atan2(
+                    portal.position.y - body.translation().y,
+                    portal.position.x - body.translation().x
+                );
+                let suckForce = {
+                    x: Math.cos(suckAngle) * suckStrength,
+                    y: Math.sin(suckAngle) * suckStrength
+                };
+                let distance = Math.sqrt(
+                    Math.pow(portal.position.x - body.translation().x, 2) +
+                    Math.pow(portal.position.y - body.translation().y, 2)
+                ) - 8;
+                if (distance < 0) {
+                    // world.removeRigidBody(body);
+                    playerHasBeenSummoned = true;
+                    spriteMesh.userData = null;
+                    console.log('Player has been summoned');
+                    const obeyDiv: HTMLDivElement = document.getElementById('obey') as HTMLDivElement;
+                    obeyDiv.style.display = 'block';
+                    obeyDiv.innerText = 'YOU have been summoned !';
+                }
+                if (body) {
+                    body.applyImpulse(suckForce, true);
+                }
+            }
+
+        }
+
         world.step(eventQueue);
         setTimeout(gameLoop, 1000 / 60);
     };
@@ -497,6 +583,7 @@ const createSummonsDocument = (documentNumber: number): string => {
     const place = places[Math.floor(Math.random() * places.length)];
     const reason = reasons[Math.floor(Math.random() * reasons.length)];
 
+    const summonsDocumentMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
     const summonsDocumentMesh = new THREE.Mesh(summonsDocumentGeometry, summonsDocumentMaterial);
     summonsDocumentMesh.position.copy(roomMesh.position);
     summonsDocumentMesh.position.z += 0.2;
@@ -532,7 +619,6 @@ const createSummonsDocument = (documentNumber: number): string => {
     summonsContainerDiv.style.display = 'block';
 
 
-
     return text;
 }
 
@@ -560,14 +646,43 @@ loadAllLanguages().then(() => {
             spriteMap.offset.x = animationIndex / 32;
         }
         if (currentDocument.progression >= currentDocument.difficulty) {
-            const document = createSummonsDocument(currentDocument.documentNumber);
+            createSummonsDocument(currentDocument.documentNumber);
             currentDocument = {
                 progression: 0,
                 documentNumber: currentDocument.documentNumber + 1,
                 difficulty: Math.random() * 10000 + 2000,
             };
+
+            const summonsDiv: HTMLDivElement = document.getElementById('summons') as HTMLDivElement;
+            summonsDiv.innerText = `Summons: ${currentDocument.documentNumber}`;
+
+            if (currentDocument.documentNumber >= documentsBeforePortal) {
+                const summonsContainerDiv: HTMLDivElement = document.getElementById('summonsDocumentContainer') as HTMLDivElement;
+                summonsContainerDiv.style.display = 'none';
+                portal.visible = true;
+                animation = animations['falling'];
+                animationIndex = animation.start;
+                animationStart = performance.now() + animation.speed;
+                spriteMap.offset.x = animationIndex / 32;
+
+                const playerDocumentRigidBodyDesc = RAPIER.RigidBodyDesc
+                    .dynamic()
+                    .setTranslation(spriteMesh.position.x, spriteMesh.position.y)
+                    .setLinearDamping(0.55)
+                    .setCcdEnabled(true);
+                const playerDocumentRigidBody = world.createRigidBody(playerDocumentRigidBodyDesc);
+                const playerDocumentColliderDesc = RAPIER.ColliderDesc
+                    .cuboid(4, 8)
+                    .setRestitution(0.5)
+                    .setActiveEvents(ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS);
+                const playerDocumentCollider = world.createCollider(playerDocumentColliderDesc, playerDocumentRigidBody);
+                spriteMesh.userData = playerDocumentRigidBody;
+
+                suck = true;
+            }
+
         } else {
-            currentDocument.progression += 100;
+            currentDocument.progression += workingPower;
         }
     }
 
@@ -585,13 +700,17 @@ loadAllLanguages().then(() => {
 
     let lastKey = '';
     window.addEventListener('keydown', (event) => {
-        if (event.key !== lastKey && sceneIsReady) {
+        if (event.key !== lastKey && sceneIsReady && portal.visible === false) {
             work();
             lastKey = event.key;
         }
     });
 
     window.setInterval(() => {
-        procrastinate();
+        if (portal.visible === false) {
+            procrastinate();
+        } else {
+            CHATTER_BOX.stop();
+        }
     }, toleratedDelay / 2);
 });

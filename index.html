@@ -25,13 +25,13 @@
 
 		.summonsDocument {
 			font-family: "VT323", monospace;
-			font-size: 20px;
+			font-size: 2em;
 			color: black;
 			background-color: white;
 			position: absolute;
-			top: 20%;
-			left: 50%;
-			width: 200px;
+			top: 10%;
+			left: 35%;
+			width: 30%;
 			margin: 10px;
 			z-index: 100000;
 			padding: 10px;
@@ -72,21 +72,46 @@
 			display: none;
 		}
 
-		@keyframes franticMove {
-			0% { transform: translate(0, 0); }
-			25% { transform: translate(2px, 0); }
-			50% { transform: translate(0, 2px); }
-			75% { transform: translate(-2px, 0); }
-			100% { transform: translate(0, -2px); }
+		#summons {
+			position: absolute;
+			top: 20px;
+			left: 120px;
+			font-family: "VT323", monospace;
+			font-size: 80px;
+			color: black;
+			text-align: center;
+			z-index: 1000000;
+			display: none;
 		}
 
+		@keyframes franticMove {
+			0% {
+				transform: translate(0, 0);
+			}
+
+			25% {
+				transform: translate(2px, 0);
+			}
+
+			50% {
+				transform: translate(0, 2px);
+			}
+
+			75% {
+				transform: translate(-2px, 0);
+			}
+
+			100% {
+				transform: translate(0, -2px);
+			}
+		}
 	</style>
 </head>
 
 <body>
 	<div id="obey" class="franticRedText">Draft summons !</div>
-	<div id="summonsDocumentContainer" class="debug summonsDocument"><img
-			src="/assets/textures/buildings/document-header.png" />
+	<div id="summons">Summons: 0</div>
+	<div id="summonsDocumentContainer" class="debug summonsDocument">
 		<div id="summonsDocumentText"></div>
 		<div class="tail"></div>
 		<div class="tail2"></div>
