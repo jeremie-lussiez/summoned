@@ -1,0 +1,1 @@
+export const pickOne = (list: unknown[]): unknown => list[Math.floor(Math.random() * list.length)];

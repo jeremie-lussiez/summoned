@@ -1,15 +1,26 @@
 import * as THREE from 'three';
-import { CHATTER_BOX, loadAllLanguages } from './game/lib/effects/chatter-box';
 import RAPIER, { ActiveEvents } from '@dimforge/rapier2d-compat';
+import { playerAnimations } from './game/animations/player-animations';
+import { summonsReasons } from './game/lists/summons-reasons';
+import { summonsPlaces } from './game/lists/summons-places';
+import { pickOne } from './game/lists/pick-one';
+import { loadAllLanguages, CHATTER_BOX } from './game/effects/chatter-box';
 
 let playerHasBeenSummoned = false;
-
-const documentsBeforePortal = 50;
-const travellingSpeed = 0.0005;
+const documentsBeforePortal = 5;
+const travellingSpeed = 0.005;
 const workingPower = 1000;
 const printerStrength = 100;
 
 const scene = new THREE.Scene();
+
+const mousePlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(50000, 50000, 1, 1),
+    new THREE.MeshBasicMaterial({
+        color: 0xff00ff, alphaTest: 0, visible: false
+    })
+);
+scene.add(mousePlane);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
 camera.position.y = 160;
@@ -52,10 +63,10 @@ const createBuilding = (texture, x: number, y: number, z: number): THREE.Mesh =>
 
 const loader = new THREE.TextureLoader();
 
-const loadTexture =  (name, width, height, repeatHeight) => {
+const loadTexture = (name, width, height, repeatHeight) => {
     const texture = {
-        top:  loader.load('assets/textures/buildings/' + name + '.png'),
-        repeat:  loader.load('assets/textures/buildings/' + name + '-repeat.png'),
+        top: loader.load('assets/textures/buildings/' + name + '.png'),
+        repeat: loader.load('assets/textures/buildings/' + name + '-repeat.png'),
         width: width,
         height: height,
         repeatHeight: repeatHeight,
@@ -80,8 +91,8 @@ const loadTexture =  (name, width, height, repeatHeight) => {
     return texture;
 }
 
-const loadSky =  () => {
-    const skyTexture =  loader.load('assets/textures/buildings/sky.png');
+const loadSky = () => {
+    const skyTexture = loader.load('assets/textures/buildings/sky.png');
     skyTexture.wrapS = THREE.RepeatWrapping;
     skyTexture.repeat.set(400, 1);
 
@@ -97,8 +108,8 @@ const loadSky =  () => {
 
 }
 
-const loadPortal =  () => {
-    const portalTexture =  loader.load('assets/textures/buildings/isekaied-portal.png');
+const loadPortal = () => {
+    const portalTexture = loader.load('assets/textures/buildings/isekaied-portal.png');
     portalTexture.wrapS = THREE.RepeatWrapping;
     portalTexture.repeat.set(1 / 6, 1);
 
@@ -115,11 +126,11 @@ const loadPortal =  () => {
 }
 
 const textures = [
-     loadTexture('skyline-radio', 40, 64, 22),
-     loadTexture('skyline-skyscraper', 64, 22, 19),
+    loadTexture('skyline-radio', 40, 64, 22),
+    loadTexture('skyline-skyscraper', 64, 22, 19),
 ]
 
-const jamesonBuilding =  loadTexture('skyline-jameson', 85, 103, 48);
+const jamesonBuilding = loadTexture('skyline-jameson', 85, 103, 48);
 
 for (let i = 0; i < 200; i++) {
     const texture = textures[Math.floor(Math.random() * textures.length)];
@@ -134,7 +145,7 @@ for (let i = 0; i < 200; i++) {
 const jamesonBuildingLastFloor = 210;
 const jamesonBuildingMesh = createBuilding(jamesonBuilding, 0, jamesonBuildingLastFloor, 0);
 
-const roomTexture =  loader.load('assets/textures/buildings/rooms.png');
+const roomTexture = loader.load('assets/textures/buildings/rooms.png');
 const roomMaterial = new THREE.MeshBasicMaterial({ map: roomTexture, transparent: true });
 roomMaterial.map.magFilter = THREE.NearestFilter;
 roomMaterial.map.minFilter = THREE.NearestFilter;
@@ -194,93 +205,7 @@ spriteMesh.position.y -= 22;
 scene.add(spriteMesh);
 
 
-const animations = {
-    'typing': {
-        start: 30,
-        end: 31,
-        speed: 100,
-    },
-    'sitting': {
-        start: 29,
-        end: 29,
-        speed: 1000000,
-    },
-    'falling': {
-        start: 1,
-        end: 2,
-        speed: 100,
-    },
-    'iddleRight': {
-        start: 3,
-        end: 3,
-        speed: 150,
-    },
-    'walkingRight': {
-        start: 3,
-        end: 5,
-        speed: 150,
-    },
-    'iddleLeft': {
-        start: 6,
-        end: 6,
-        speed: 150,
-    },
-    'walkingLeft': {
-        start: 6,
-        end: 8,
-        speed: 150,
-    },
-    'knightCastingRight': {
-        start: 9,
-        end: 10,
-        speed: 75,
-    },
-    'knightCastingLeft': {
-        start: 11,
-        end: 12,
-        speed: 75,
-    },
-    'knightSlashingRight': {
-        start: 13,
-        end: 14,
-        speed: 150,
-    },
-    'knightSlashingLeft': {
-        start: 15,
-        end: 16,
-        speed: 150,
-    },
-    'knightWalkingRight': {
-        start: 17,
-        end: 19,
-        speed: 200,
-    },
-    'knightWalkingLeft': {
-        start: 20,
-        end: 22,
-        speed: 200,
-    },
-    'groceriesIddleRight': {
-        start: 23,
-        end: 23,
-        speed: 10000,
-    },
-    'groceriesWalkingRight': {
-        start: 24,
-        end: 25,
-        speed: 200,
-    },
-    'groceriesIddleLeft': {
-        start: 26,
-        end: 26,
-        speed: 10000,
-    },
-    'groceriesWalkingLeft': {
-        start: 27,
-        end: 28,
-        speed: 200,
-    },
-};
+const animations = playerAnimations;
 
 let animation = animations['iddleLeft'];
 let animationIndex = animation.start;
@@ -297,9 +222,9 @@ window.addEventListener('click', (event) => {
     start = true;
 });
 
- loadSky();
+loadSky();
 
-const portal =  loadPortal();
+const portal = loadPortal();
 
 portal.position.copy(roomMesh.position);
 portal.position.y -= 2;
@@ -310,11 +235,13 @@ portal.visible = false;
 
 
 const summonsDocuments: THREE.Mesh[] = [];
+const summonedThings: THREE.Mesh[] = [];
 const summonsDocumentGeometry = new THREE.PlaneGeometry(3, 1, 1, 1);
 
 let suck = false;
 let lastTime = performance.now();
 let sceneIsReady = false;
+let darken = 1;
 function animate() {
     requestAnimationFrame(animate);
     renderer.render(scene, camera);
@@ -325,7 +252,12 @@ function animate() {
     // const dayCycleOpacity = (Math.sin(now * 0.0005) * 0.5 + 0.5) * 0.9 + 0.1;
 
     // summonsDocumentMaterial.opacity = dayCycleOpacity;
-    // roomMesh.material.opacity = dayCycleOpacity;
+
+    if (suck) {
+        roomMesh.material.opacity = darken;
+        darken -= delta * 0.0005;
+        darken = Math.max(0, Math.min(1, darken));
+    }
 
     summonsDocuments.forEach((summonsDocument) => {
         // summonsDocument.position.x -= 0.1;
@@ -348,6 +280,14 @@ function animate() {
         // if (summonsDocument.material.opacity <= 0) {
         //     scene.remove(summonsDocument);
         // }
+    });
+
+    summonedThings.forEach((summonedThing) => {
+        if (summonedThing.userData) {
+            summonedThing.position.y = summonedThing.userData.translation().y;
+            summonedThing.position.x = summonedThing.userData.translation().x;
+            summonedThing.rotation.z = summonedThing.userData.rotation();
+        }
     });
 
     if (suck && spriteMesh.userData) {
@@ -398,6 +338,9 @@ function animate() {
             backgroundPlate.material.opacity = 0;
         }
     } else if (!sceneIsReady) {
+        const music = document.getElementById('music')
+        music.volume = 0.2;
+        music.play();
         sceneIsReady = true;
         const obeyDiv: HTMLDivElement = document.getElementById('obey') as HTMLDivElement;
         obeyDiv.style.display = 'block';
@@ -410,34 +353,6 @@ function animate() {
 
 }
 animate();
-
-const reasons = [
-    'For failing to renew your annual breathing license',
-    'For owning more books than the government mandated limit',
-    'For using banned words from the Old Language during a casual conversation',
-    'For unauthorized dreaming of non-state-approved scenarios',
-    'For possession of an unregistered cat',
-    'For possession of an unregistered dog',
-    'For possession of an unregistered child',
-    'For installing solar panels without the permission to harvest sunlight',
-    'For laughing after 8 PM in a residential zone',
-    'For failing to fill your mandatory happiness quota',
-    'For maintaining eye contact less than five seconds with a statue of the Great Leader',
-    'For keeping using an item that was scheduled to be obsolete',
-    'For wearing mismatched socks on a day of national significance',
-    'For unauthorized teleportation within restricted urban zones',
-    'For refusing to participate in the mandatory annual Telepathy Test',
-    'For holding an illegal opinion on the taste of state-produced food'
-];
-
-const places = [
-    'Room 101, Jameson Building',
-    'Kangaroo Court, Jameson Building',
-    'Kafka street, Hight court of Treasonous Thoughts',
-    'Room 404, Ministry of Truth',
-    'Room 1984, Ministry of Love',
-    'Room 451, Ministry of Happiness',
-]
 
 let world;
 
@@ -576,13 +491,13 @@ RAPIER.init().then(() => {
     gameLoop();
 });
 
-const createSummonsDocument = (documentNumber: number): string => {
+const createSummonsDocument = (documentNumber: number): void => {
     const name = 'Jameson, Jameson, Jameson & Partners';
     const futureOffset = 3600 * 24 * 365 * 1000 * 10;
     const date = new Date(Date.now() + (3600 * 1000 * 24 * documentNumber) + futureOffset).toLocaleDateString();
     const time = `${Math.floor(Math.random() * 24).toString().padStart(2, '0')}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`;
-    const place = places[Math.floor(Math.random() * places.length)];
-    const reason = reasons[Math.floor(Math.random() * reasons.length)];
+    const place = pickOne(summonsPlaces);
+    const reason = pickOne(summonsReasons);
 
     const summonsDocumentMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
     const summonsDocumentMesh = new THREE.Mesh(summonsDocumentGeometry, summonsDocumentMaterial);
@@ -618,9 +533,6 @@ const createSummonsDocument = (documentNumber: number): string => {
 
     summonsTextDiv.innerText = text;
     summonsContainerDiv.style.display = 'block';
-
-
-    return text;
 }
 
 let currentDocument = {
@@ -628,6 +540,174 @@ let currentDocument = {
     documentNumber: 0,
     difficulty: 6000,
 };
+
+mousePlane.position.z = roomMesh.position.z;
+
+const geometry = new THREE.BoxGeometry(1, 1, 1);
+const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+const cube = new THREE.Mesh(geometry, material);
+cube.position.copy(mousePlane.position);
+scene.add(cube);
+
+const geometry2 = new THREE.BoxGeometry(1, 1, 1);
+const material2 = new THREE.MeshBasicMaterial({ color: 0xff8800 });
+const cube2 = new THREE.Mesh(geometry2, material2);
+cube2.position.copy(mousePlane.position);
+scene.add(cube2);
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+
+const stuffDefinitions = [
+    {
+        id: 'rubberDuck',
+        index: 0,
+        width: 3,
+        height: 3,
+        material: null,
+    },
+    {
+        id: 'anvil',
+        index: 1,
+        width: 5,
+        height: 4,
+        material: null,
+    },
+    {
+        id: 'paperClip',
+        index: 2,
+        width: 4,
+        height: 3,
+        material: null,
+    },
+    {
+        id: 'boomBox',
+        index: 3,
+        width: 8,
+        height: 4,
+        material: null,
+    },
+    {
+        id: 'boozeBottle',
+        index: 4,
+        width: 1,
+        height: 5,
+        material: null,
+    },
+    {
+        id: 'shovel',
+        index: 5,
+        width: 1,
+        height: 8,
+        material: null,
+    },
+    {
+        id: 'rubberChicken',
+        index: 6,
+        width: 1,
+        height: 6,
+        material: null,
+    }
+];
+
+const stuffFrames = 7;
+const stuffSize = 8;
+
+stuffDefinitions.forEach((definition) => {
+    const texture = new THREE.TextureLoader().load('assets/textures/buildings/stuff.png');
+    const stuffMaterial = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true });
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.magFilter = THREE.NearestFilter;
+    texture.repeat.set(1 / stuffFrames, 1);
+    stuffMaterial.map.offset.x = definition.index / stuffFrames;
+    definition.material = stuffMaterial;
+});
+
+const summonStuff = (x: number, y: number, z: number, force: number, angle: number) => {
+
+    const definition = stuffDefinitions[Math.floor(Math.random() * stuffDefinitions.length)];
+
+    const stuffGeometry = new THREE.PlaneGeometry(stuffSize, stuffSize, 1, 1);
+    const stuffMesh = new THREE.Mesh(stuffGeometry, definition.material);
+    stuffMesh.position.z = z;
+    stuffMesh.position.x = x;
+    stuffMesh.position.y = y;
+    scene.add(stuffMesh);
+
+    const stuffRigidBodyDesc = RAPIER.RigidBodyDesc
+        .dynamic()
+        .setTranslation(stuffMesh.position.x, stuffMesh.position.y)
+        .setLinearDamping(0.55)
+        .setCcdEnabled(true);
+    const stuffRigidBody = world.createRigidBody(stuffRigidBodyDesc);
+    const stuffColliderDesc = RAPIER.ColliderDesc
+        .cuboid(definition.width / 2, definition.height / 2)
+        .setRestitution(0.5)
+        .setActiveEvents(ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS);
+    const stuffCollider = world.createCollider(stuffColliderDesc, stuffRigidBody);
+    stuffMesh.userData = stuffRigidBody;
+
+    const stuffImpulse = { x: Math.cos(angle) * force, y: Math.sin(angle) * force };
+    stuffRigidBody.applyImpulse(stuffImpulse, true);
+
+    scene.add(stuffMesh);
+
+    summonedThings.push(stuffMesh);
+
+}
+
+let isFighting = false;
+
+addEventListener('click', (event) => {
+    if (isFighting) {
+
+        pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+        pointer.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(pointer, camera);
+
+        const intersects = raycaster.intersectObjects([mousePlane]);
+
+        const xPos = intersects[0].point.x;
+        const yPos = intersects[0].point.y;
+
+        const distanceToSprite = Math.sqrt(Math.pow(spriteMesh.position.x - xPos, 2) + Math.pow(spriteMesh.position.y - yPos, 2));
+
+        console.log('distance:', distanceToSprite, xPos, yPos);
+
+        const angle = Math.atan2(yPos - spriteMesh.position.y, xPos - spriteMesh.position.x);
+
+        cube2.position.x = spriteMesh.position.x + Math.cos(angle) * 8;
+        cube2.position.y = spriteMesh.position.y + Math.sin(angle) * 8;
+
+        summonStuff(cube2.position.x, cube2.position.y, spriteMesh.position.z + 0.01, distanceToSprite * 20 + 5, angle);
+    }
+
+});
+
+window.addEventListener('mousemove', (event) => {
+
+    if (isFighting) {
+
+        pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+        pointer.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(pointer, camera);
+
+        const intersects = raycaster.intersectObjects([mousePlane]);
+
+        const xPos = intersects[0].point.x;
+        const yPos = intersects[0].point.y;
+
+        const angle = Math.atan2(yPos - spriteMesh.position.y, xPos - spriteMesh.position.x);
+
+        cube.position.x = spriteMesh.position.x + Math.cos(angle) * 8;
+        cube.position.y = spriteMesh.position.y + Math.sin(angle) * 8;
+    }
+
+});
+
 
 loadAllLanguages().then(() => {
     const toleratedDelay = 500;
