@@ -1,5 +1,5 @@
 import { TextureLoader, MeshBasicMaterial, ClampToEdgeWrapping, DoubleSide, Mesh, NearestFilter, PlaneGeometry, Texture } from "three";
-import { SpriteAnimation } from "./sprite-animation";
+import { SpriteAnimation } from "../animations/sprite-animation";
 
 export class AnimatedSprite {
     private animations: Record<string, SpriteAnimation>;

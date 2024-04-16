@@ -3,12 +3,26 @@ import RAPIER, { ActiveEvents, Collider } from '@dimforge/rapier2d-compat';
 import { playerAnimations } from './game/animations/player-animations';
 import { summonsReasons } from './game/lists/summons-reasons';
 import { summonsPlaces } from './game/lists/summons-places';
-import { pickOne } from './game/lists/pick-one';
-import { loadAllLanguages, CHATTER_BOX } from './game/effects/chatter-box';
-import { AnimatedSprite } from './game/animations/animated-sprite';
+import { pickOne } from './game/lib/pick-one';
+import { loadAllLanguages, CHATTER_BOX } from './game/lib/chatter-box';
+import { AnimatedSprite } from './game/lib/animated-sprite';
 import { portalAnimations } from './game/animations/portal-animations';
 import { gobAnimations } from './game/animations/gob-animations';
 import { Mesh } from 'three';
+import { RapierGroupFactory } from './game/lib/rapier-group-factory';
+
+RapierGroupFactory.createGroup('ground');
+RapierGroupFactory.createGroup('player');
+RapierGroupFactory.createGroup('gobs');
+RapierGroupFactory.createGroup('summonsDocuments');
+RapierGroupFactory.createGroup('summonedThings');
+
+export class PhysicsGameSpriteEntity {
+    public sprite: AnimatedSprite;
+    public mesh: THREE.Mesh;
+    public body: RAPIER.RigidBody;
+    public collider: RAPIER.Collider;
+}
 
 const obeyDiv: HTMLDivElement = document.getElementById('obey') as HTMLDivElement;
 const summonsTextDiv: HTMLDivElement = document.getElementById('summons') as HTMLDivElement;
@@ -534,7 +548,7 @@ RAPIER.init().then(() => {
     const groundRigidBody = world.createRigidBody(groundRigidBodyDesc);
     const groundColliderDesc = RAPIER.ColliderDesc
         .cuboid(1000, 2)
-        .setCollisionGroups(0x0001000f)
+        .setCollisionGroups(RapierGroupFactory.composeGroups(['ground']))
         .setRestitution(0.4);
     const groundCollider = world.createCollider(groundColliderDesc, groundRigidBody);
 
@@ -547,7 +561,7 @@ RAPIER.init().then(() => {
     const ceilingColliderDesc = RAPIER.ColliderDesc
         .cuboid(60, 2)
         // .setCollisionGroups(0x00010007)
-        .setCollisionGroups(0x00000000)
+        .setCollisionGroups(RapierGroupFactory.composeGroups(['ground']))
         .setRestitution(0.4);
     ceilingCollider = world.createCollider(ceilingColliderDesc, ceilingRigidBody);
 
@@ -559,7 +573,7 @@ RAPIER.init().then(() => {
     const leftWallRigidBody = world.createRigidBody(leftWallRigidBodyDesc);
     const leftWallColliderDesc = RAPIER.ColliderDesc
         .cuboid(2, 60)
-        .setCollisionGroups(0x0001000f)
+        .setCollisionGroups(RapierGroupFactory.composeGroups(['ground']))
         .setRestitution(0.4);
     leftWallCollider = world.createCollider(leftWallColliderDesc, leftWallRigidBody);
 
@@ -571,7 +585,7 @@ RAPIER.init().then(() => {
     const rightWallRigidBody = world.createRigidBody(rightWallRigidBodyDesc);
     const rightWallColliderDesc = RAPIER.ColliderDesc
         .cuboid(2, 60)
-        .setCollisionGroups(0x0001000f)
+        .setCollisionGroups(RapierGroupFactory.composeGroups(['ground']))
         .setRestitution(0.4);
     rightWallCollider = world.createCollider(rightWallColliderDesc, rightWallRigidBody);
 
@@ -760,7 +774,7 @@ const createSummonsDocument = (documentNumber: number): void => {
         const summonsDocumentRigidBody = world.createRigidBody(summonsDocumentRigidBodyDesc);
         const summonsDocumentColliderDesc = RAPIER.ColliderDesc
             .cuboid(1.5, 0.5)
-            .setCollisionGroups(0x00080009)
+            .setCollisionGroups(RapierGroupFactory.composeGroups(['summonsDocuments'], ['ground', 'summonsDocuments']))
             .setRestitution(0.5);
         const summonsDocumentCollider = world.createCollider(summonsDocumentColliderDesc, summonsDocumentRigidBody);
         summonsDocumentMesh.userData = summonsDocumentRigidBody;
@@ -873,7 +887,7 @@ const summonStuff = (x: number, y: number, z: number, force: number, angle: numb
     const stuffRigidBody = world.createRigidBody(stuffRigidBodyDesc);
     const stuffColliderDesc = RAPIER.ColliderDesc
         .cuboid(definition.width / 2, definition.height / 2)
-        .setCollisionGroups(0x00040003)
+        .setCollisionGroups(RapierGroupFactory.composeGroups(['summonedThings'], ['ground', 'gobs']))
         .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.DYNAMIC_DYNAMIC)
         .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS)
         .setRestitution(0.5);
@@ -930,7 +944,7 @@ addEventListener('click', (event) => {
             const rigidBody = world.createRigidBody(rigidBodyDesc);
             const colliderDesc = RAPIER.ColliderDesc
                 .capsule(7, 1)
-                .setCollisionGroups(0x00020005)
+                .setCollisionGroups(RapierGroupFactory.composeGroups(['gobs'], ['ground', 'summonedThings']))
                 .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.DYNAMIC_DYNAMIC)
                 .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS)
                 .setRestitution(0.5);
@@ -1061,7 +1075,7 @@ loadAllLanguages().then(() => {
                 const playerRigidBody = world.createRigidBody(playerRigidBodyDesc);
                 const playerColliderDesc = RAPIER.ColliderDesc
                     .cuboid(4, 8)
-                    .setCollisionGroups(0x00010001)
+                    .setCollisionGroups(RapierGroupFactory.composeGroups(['player'], ['ground']))
                     .setRestitution(0.5);
                 const playerCollider = world.createCollider(playerColliderDesc, playerRigidBody);
                 playerMesh.userData = playerRigidBody;
