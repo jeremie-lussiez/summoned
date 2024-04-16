@@ -10,6 +10,7 @@ import { portalAnimations } from './game/animations/portal-animations';
 import { gobAnimations } from './game/animations/gob-animations';
 import { Mesh } from 'three';
 import { RapierGroupFactory } from './game/lib/rapier-group-factory';
+import { SKYSCRAPER_TEXTURES, createSkyscraper } from './game/scenery/skyline';
 
 RapierGroupFactory.createGroup('ground');
 RapierGroupFactory.createGroup('player');
@@ -18,8 +19,8 @@ RapierGroupFactory.createGroup('summonsDocuments');
 RapierGroupFactory.createGroup('summonedThings');
 
 export class PhysicsGameSpriteEntity {
+    id: number;
     public sprite: AnimatedSprite;
-    public mesh: THREE.Mesh;
     public body: RAPIER.RigidBody;
     public collider: RAPIER.Collider;
 }
@@ -102,8 +103,6 @@ const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-const repeatFloors = 100;
-
 const updateCamera = (): void => {
     const ratio = window.innerWidth / window.innerHeight;
     camera.aspect = ratio;
@@ -146,55 +145,22 @@ window.addEventListener('resize', () => {
     updateCamera();
 }, false);
 
-
 const buildingsMeshes: Mesh[] = [];
-const createBuilding = (texture, x: number, y: number, z: number): THREE.Mesh => {
-    const topGeometry = new THREE.PlaneGeometry(texture.width, texture.height);
-    const topMesh = new THREE.Mesh(topGeometry, texture.topMaterial);
-    topMesh.position.x = x;
-    topMesh.position.y = y;
-    topMesh.position.z = z;
-    const repeatGeometry = new THREE.PlaneGeometry(texture.width, texture.repeatHeight * repeatFloors);
-    const repeatMesh = new THREE.Mesh(repeatGeometry, texture.repeatMaterial);
-    repeatMesh.position.x = 0;
-    repeatMesh.position.y = - texture.repeatHeight * repeatFloors / 2 - texture.height / 2;
-    repeatMesh.position.z = 0;
-    topMesh.add(repeatMesh);
-    scene.add(topMesh);
-    buildingsMeshes.push(topMesh);
-    return topMesh;
+
+for (let i = 0; i < 200; i++) {
+    const texture = SKYSCRAPER_TEXTURES[Math.floor(Math.random() * SKYSCRAPER_TEXTURES.length - 1) + 1];
+    const x = Math.random() * 2000 - 1000;
+    const z = Math.random() * 1000 - 500;
+    const y = -z;
+    const mesh = createSkyscraper(scene, texture, x, y, z);
+    buildingsMeshes.push(mesh);
 }
+
+const jamesonBuildingLastFloor = 210;
+const jamesonBuildingMesh = createSkyscraper(scene, SKYSCRAPER_TEXTURES[0], 0, jamesonBuildingLastFloor, 0);
+buildingsMeshes.push(jamesonBuildingMesh);
 
 const loader = new THREE.TextureLoader();
-
-const loadTexture = (name, width, height, repeatHeight) => {
-    const texture = {
-        top: loader.load('assets/textures/buildings/' + name + '.png'),
-        repeat: loader.load('assets/textures/buildings/' + name + '-repeat.png'),
-        width: width,
-        height: height,
-        repeatHeight: repeatHeight,
-    }
-
-    texture.repeat.wrapS = THREE.RepeatWrapping;
-    texture.repeat.wrapT = THREE.RepeatWrapping;
-    texture.repeat.repeat.set(1, 70);
-
-    const topMaterial = new THREE.MeshBasicMaterial({ map: texture.top, transparent: true });
-    topMaterial.map.magFilter = THREE.NearestFilter;
-    topMaterial.map.minFilter = THREE.NearestFilter;
-
-    texture.topMaterial = topMaterial;
-
-    const repeatMaterial = new THREE.MeshBasicMaterial({ map: texture.repeat, transparent: true });
-    repeatMaterial.map.magFilter = THREE.NearestFilter;
-    repeatMaterial.map.minFilter = THREE.NearestFilter;
-
-    texture.repeatMaterial = repeatMaterial;
-
-    return texture;
-}
-
 const loadSky = () => {
     const skyTexture = loader.load('assets/textures/buildings/sky.png');
     skyTexture.wrapS = THREE.RepeatWrapping;
@@ -225,26 +191,6 @@ const loadGround = () => {
     const mesh = new THREE.Mesh(geometry, material);
     return mesh;
 }
-
-const textures = [
-    loadTexture('skyline-radio', 40, 64, 22),
-    loadTexture('skyline-skyscraper', 64, 22, 19),
-]
-
-const jamesonBuilding = loadTexture('skyline-jameson', 85, 103, 48);
-
-for (let i = 0; i < 200; i++) {
-    const texture = textures[Math.floor(Math.random() * textures.length)];
-    const shade = Math.random() * 100 + 155;
-    const x = Math.random() * 2000 - 1000;
-    const z = Math.random() * 1000 - 500;
-    const y = -z;
-    createBuilding(texture, x, y, z);
-}
-
-
-const jamesonBuildingLastFloor = 210;
-const jamesonBuildingMesh = createBuilding(jamesonBuilding, 0, jamesonBuildingLastFloor, 0);
 
 const roomTexture = loader.load('assets/textures/buildings/rooms.png');
 const roomMaterial = new THREE.MeshBasicMaterial({ map: roomTexture, transparent: true });
@@ -357,7 +303,6 @@ function animate() {
     }
 
     summonsDocuments.forEach((summonsDocument) => {
-        // summonsDocument.position.x -= 0.1;
         const distanceToPortal = portalMesh.position.distanceTo(summonsDocument.position);
         if (distanceToPortal < 10) {
             summonsDocument.material.opacity = 1 - distanceToPortal / 10;
@@ -365,7 +310,6 @@ function animate() {
             summonsDocument.material.opacity = 1;
         }
         if (distanceToPortal < 3) {
-            // scene.remove(summonsDocument);
             summonsDocument.visible = false;
         }
         if (summonsDocument.userData) {
@@ -373,10 +317,6 @@ function animate() {
             summonsDocument.position.x = summonsDocument.userData.translation().x;
             summonsDocument.rotation.z = summonsDocument.userData.rotation();
         }
-        // summonsDocument.material.opacity -= 0.01;
-        // if (summonsDocument.material.opacity <= 0) {
-        //     scene.remove(summonsDocument);
-        // }
     });
 
     summonedThings.forEach((summonedThing) => {
@@ -1115,3 +1055,4 @@ loadAllLanguages().then(() => {
         }
     }, toleratedDelay / 2);
 });
+
