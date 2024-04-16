@@ -1,4 +1,4 @@
-import { SpriteAnimation } from "./sprite-animation";
+import { SpriteAnimation } from "../lib/sprite-animation";
 
 export const playerAnimations: Record<string, SpriteAnimation> = {
     'typing': {

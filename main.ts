@@ -11,6 +11,7 @@ import { gobAnimations } from './game/animations/gob-animations';
 import { Mesh } from 'three';
 import { RapierGroupFactory } from './game/lib/rapier-group-factory';
 import { SKYSCRAPER_TEXTURES, createSkyscraper } from './game/scenery/skyline';
+import { stuffList } from './game/animations/stuff-list';
 
 RapierGroupFactory.createGroup('ground');
 RapierGroupFactory.createGroup('player');
@@ -41,7 +42,7 @@ const workingPower = 800;
 const moveStrength = 60;
 const printerStrength = 100;
 let suckStrength = 10.5;
-let playerSuckStrength = 25;
+let playerSuckStrength = 28;
 
 const gameState = {
     index: 0,
@@ -140,7 +141,6 @@ for (let i = 0; i < 10; i++) {
     });
 }
 
-
 window.addEventListener('resize', () => {
     updateCamera();
 }, false);
@@ -204,9 +204,9 @@ roomMesh.position.z = -20;
 scene.add(roomMesh);
 
 const smallHandMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-const smallHandGeometry = new THREE.PlaneGeometry(1, 2, 1, 1);
+const smallHandGeometry = new THREE.PlaneGeometry(0.5, 2, 1, 1);
 const bigHandMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-const bigHandGeometry = new THREE.PlaneGeometry(1, 3, 1, 1);
+const bigHandGeometry = new THREE.PlaneGeometry(0.5, 3, 1, 1);
 const smallHandMesh = new THREE.Mesh(smallHandGeometry, smallHandMaterial);
 const bigHandMesh = new THREE.Mesh(bigHandGeometry, bigHandMaterial);
 
@@ -743,101 +743,37 @@ mousePlane.position.z = roomMesh.position.z;
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
-const stuffDefinitions = [
-    {
-        id: 'rubberDuck',
-        index: 0,
-        width: 3,
-        height: 3,
-        material: null,
-    },
-    {
-        id: 'anvil',
-        index: 1,
-        width: 5,
-        height: 4,
-        material: null,
-    },
-    {
-        id: 'paperClip',
-        index: 2,
-        width: 4,
-        height: 3,
-        material: null,
-    },
-    {
-        id: 'boomBox',
-        index: 3,
-        width: 8,
-        height: 4,
-        material: null,
-    },
-    {
-        id: 'boozeBottle',
-        index: 4,
-        width: 1,
-        height: 5,
-        material: null,
-    },
-    {
-        id: 'shovel',
-        index: 5,
-        width: 1,
-        height: 8,
-        material: null,
-    },
-    {
-        id: 'rubberChicken',
-        index: 6,
-        width: 1,
-        height: 6,
-        material: null,
-    }
-];
-
-const stuffFrames = 7;
 const stuffSize = 8;
-
-stuffDefinitions.forEach((definition) => {
-    const texture = new THREE.TextureLoader().load('assets/textures/buildings/stuff.png');
-    const stuffMaterial = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true });
-    texture.wrapS = THREE.ClampToEdgeWrapping;
-    texture.magFilter = THREE.NearestFilter;
-    texture.repeat.set(1 / stuffFrames, 1);
-    stuffMaterial.map.offset.x = definition.index / stuffFrames;
-    definition.material = stuffMaterial;
-});
-
 const summonStuff = (x: number, y: number, z: number, force: number, angle: number) => {
 
-    const definition = stuffDefinitions[Math.floor(Math.random() * stuffDefinitions.length)];
+    const stuffSprite = new AnimatedSprite('assets/textures/buildings/stuff.png', stuffSize, stuffList);
+    const definition = stuffSprite.randomAnimation();
 
-    const stuffGeometry = new THREE.PlaneGeometry(stuffSize, stuffSize, 1, 1);
-    const stuffMesh = new THREE.Mesh(stuffGeometry, definition.material);
+    const stuffMesh = stuffSprite.mesh;
     stuffMesh.position.z = z;
     stuffMesh.position.x = x;
     stuffMesh.position.y = y;
-    scene.add(stuffMesh);
 
-    const stuffRigidBodyDesc = RAPIER.RigidBodyDesc
-        .dynamic()
-        .setTranslation(stuffMesh.position.x, stuffMesh.position.y)
-        .setLinearDamping(0.55)
-        .setCcdEnabled(true);
-    const stuffRigidBody = world.createRigidBody(stuffRigidBodyDesc);
-    const stuffColliderDesc = RAPIER.ColliderDesc
-        .cuboid(definition.width / 2, definition.height / 2)
-        .setCollisionGroups(RapierGroupFactory.composeGroups(['summonedThings'], ['ground', 'gobs']))
-        .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.DYNAMIC_DYNAMIC)
-        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS)
-        .setRestitution(0.5);
-    const stuffCollider = world.createCollider(stuffColliderDesc, stuffRigidBody);
-    stuffMesh.userData = stuffRigidBody;
-    stuffMesh.collider = stuffCollider;
+    if (definition.width && definition.height) {
+        const stuffRigidBodyDesc = RAPIER.RigidBodyDesc
+            .dynamic()
+            .setTranslation(stuffMesh.position.x, stuffMesh.position.y)
+            .setLinearDamping(0.55)
+            .setCcdEnabled(true);
+        const stuffRigidBody = world.createRigidBody(stuffRigidBodyDesc);
+        const stuffColliderDesc = RAPIER.ColliderDesc
+            .cuboid(definition.width / 2, definition.height / 2)
+            .setCollisionGroups(RapierGroupFactory.composeGroups(['summonedThings'], ['ground', 'gobs']))
+            .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.DYNAMIC_DYNAMIC)
+            .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS | ActiveEvents.CONTACT_FORCE_EVENTS)
+            .setRestitution(0.5);
+        const stuffCollider = world.createCollider(stuffColliderDesc, stuffRigidBody);
+        stuffMesh.userData = stuffRigidBody;
+        stuffMesh.collider = stuffCollider;
 
-    const stuffImpulse = { x: Math.cos(angle) * force, y: Math.sin(angle) * force };
-    stuffRigidBody.applyImpulse(stuffImpulse, true);
-
+        const stuffImpulse = { x: Math.cos(angle) * force, y: Math.sin(angle) * force };
+        stuffRigidBody.applyImpulse(stuffImpulse, true);
+    }
     scene.add(stuffMesh);
 
     summonStuffSound.play();

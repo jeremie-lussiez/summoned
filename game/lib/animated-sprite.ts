@@ -1,5 +1,5 @@
 import { TextureLoader, MeshBasicMaterial, ClampToEdgeWrapping, DoubleSide, Mesh, NearestFilter, PlaneGeometry, Texture } from "three";
-import { SpriteAnimation } from "../animations/sprite-animation";
+import { SpriteAnimation } from "./sprite-animation";
 
 export class AnimatedSprite {
     private animations: Record<string, SpriteAnimation>;
@@ -30,13 +30,14 @@ export class AnimatedSprite {
         this.mesh = new Mesh(spriteGeometry, spriteMaterial);
     }
 
-    public randomAnimation() {
+    public randomAnimation(): SpriteAnimation {
         const animations = Object.keys(this.animations);
         const animationId = animations[Math.floor(Math.random() * animations.length)];
-        this.setAnimation(animationId);
+        console.log(animationId);
+        return this.setAnimation(animationId);
     }
 
-    public setAnimation(animationId: string) {
+    public setAnimation(animationId: string): SpriteAnimation {
         const newAnimation = this.animations[animationId];
         if (newAnimation) {
             this.currentAnimation = newAnimation;
@@ -44,6 +45,7 @@ export class AnimatedSprite {
             this.animationStart = performance.now() + this.currentAnimation.speed;
             this.texture.offset.x = this.animationIndex / this.frames;
         }
+        return this.currentAnimation;
     }
 
     public update(time: number) {
