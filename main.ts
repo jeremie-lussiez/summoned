@@ -12,6 +12,7 @@ import { Mesh } from 'three';
 import { RapierGroupFactory } from './game/lib/rapier-group-factory';
 import { SKYSCRAPER_TEXTURES, createSkyscraper } from './game/scenery/skyline';
 import { stuffList } from './game/animations/stuff-list';
+import { GameStateManager } from './game/lib/game-state-manager';
 
 RapierGroupFactory.createGroup('ground');
 RapierGroupFactory.createGroup('player');
@@ -44,43 +45,70 @@ const printerStrength = 100;
 let suckStrength = 10.5;
 let playerSuckStrength = 38;
 
-const gameState = {
-    index: 0,
-    states: [
-        {
-            id: 'intro',
-            actions: () => {
-                isFighting = false;
-                playerHasBeenSummoned = false;
-                documentsBeforePortal = 5;
-            }
-        },
-        {
-            id: 'atWork',
-            actions: () => {
-                isFighting = false;
-                playerHasBeenSummoned = false;
-                documentsBeforePortal = 5;
-            }
-        },
-        {
-            id: 'working',
-            actions: () => {
-                isFighting = false;
-                playerHasBeenSummoned = false;
-                documentsBeforePortal = 5;
-            }
-        },
-        {
-            id: 'sucked',
-            actions: () => {
-                isFighting = false;
-                playerHasBeenSummoned = false;
-                documentsBeforePortal = 5;
-            }
-        }
+
+const stateManager = new GameStateManager();
+
+stateManager.addState({
+    id: 'intro',
+    data: {
+        isFighting: false,
+        playerHasBeenSummoned: false,
+        documentsBeforePortal: 5,
+    },
+    init: (globalData: any, localData: any) => {
+        localData.isFighting = false;
+        localData.playerHasBeenSummoned = false;
+        localData.documentsBeforePortal = 5;
+    },
+    transitions: [
     ]
-}
+});
+stateManager.addState({
+    id: 'atWork',
+    data: {
+        isFighting: false,
+        playerHasBeenSummoned: false,
+        documentsBeforePortal: 5,
+    },
+    init: (globalData: any, localData: any) => {
+        localData.isFighting = false;
+        localData.playerHasBeenSummoned = false;
+        localData.documentsBeforePortal = 5;
+    },
+    transitions: [
+    ]
+});
+stateManager.addState({
+    id: 'working',
+    data: {
+        isFighting: false,
+        playerHasBeenSummoned: false,
+        documentsBeforePortal: 5,
+    },
+    init: (globalData: any, localData: any) => {
+        localData.isFighting = false;
+        localData.playerHasBeenSummoned = false;
+        localData.documentsBeforePortal = 5;
+    },
+    transitions: [
+    ]
+});
+stateManager.addState({
+    id: 'sucked',
+    data: {
+        isFighting: false,
+        playerHasBeenSummoned: false,
+        documentsBeforePortal: 5,
+    },
+    init: (globalData: any, localData: any) => {
+        localData.isFighting = false;
+        localData.playerHasBeenSummoned = false;
+        localData.documentsBeforePortal = 5;
+    },
+    transitions: [
+    ]
+});
+
 
 const scene = new THREE.Scene();
 
