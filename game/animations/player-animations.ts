@@ -2,13 +2,13 @@ import { SpriteAnimation } from "../lib/sprite-animation";
 
 export const playerAnimations: Record<string, SpriteAnimation> = {
     'typing': {
-        start: 30,
-        end: 31,
+        start: 17,
+        end: 18,
         speed: 100,
     },
     'sitting': {
-        start: 29,
-        end: 29,
+        start: 16,
+        end: 16,
         speed: 1000000,
     },
     'falling': {
@@ -16,84 +16,49 @@ export const playerAnimations: Record<string, SpriteAnimation> = {
         end: 2,
         speed: 100,
     },
-    'iddleRight': {
+    'iddle': {
         start: 3,
         end: 3,
         speed: 150,
     },
-    'walkingRight': {
+    'walking': {
         start: 3,
         end: 5,
         speed: 150,
     },
-    'iddleLeft': {
+    'running': {
+        start: 3,
+        end: 5,
+        speed: 75,
+    },
+    'knightCasting': {
         start: 6,
-        end: 6,
+        end: 7,
+        speed: 75,
+    },
+    'knightSlashing': {
+        start: 8,
+        end: 9,
         speed: 150,
     },
-    'walkingLeft': {
-        start: 6,
-        end: 8,
-        speed: 150,
-    },
-    'knightCastingRight': {
-        start: 9,
+    'knightIddle': {
+        start: 10,
         end: 10,
-        speed: 75,
+        speed: 200000,
     },
-    'knightCastingLeft': {
-        start: 11,
+    'knightWalking': {
+        start: 10,
         end: 12,
-        speed: 75,
+        speed: 200,
     },
-    'knightSlashingRight': {
+    'groceriesIddle': {
         start: 13,
-        end: 14,
-        speed: 150,
-    },
-    'knightSlashingLeft': {
-        start: 15,
-        end: 16,
-        speed: 150,
-    },
-    'knightIddleRight': {
-        start: 17,
-        end: 17,
-        speed: 200000,
-    },
-    'knightWalkingRight': {
-        start: 17,
-        end: 19,
-        speed: 200,
-    },
-    'knightIddleLeft': {
-        start: 20,
-        end: 20,
-        speed: 200000,
-    },
-    'knightWalkingLeft': {
-        start: 20,
-        end: 22,
-        speed: 200,
-    },
-    'groceriesIddleRight': {
-        start: 23,
-        end: 23,
+        end: 13,
         speed: 10000,
     },
-    'groceriesWalkingRight': {
-        start: 24,
-        end: 25,
-        speed: 200,
-    },
-    'groceriesIddleLeft': {
-        start: 26,
-        end: 26,
-        speed: 10000,
-    },
-    'groceriesWalkingLeft': {
-        start: 27,
-        end: 28,
+    'groceriesWalking': {
+        start: 14,
+        end: 15,
         speed: 200,
     },
 }

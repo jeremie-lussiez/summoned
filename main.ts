@@ -5,7 +5,7 @@ import { summonsReasons } from './game/lists/summons-reasons';
 import { summonsPlaces } from './game/lists/summons-places';
 import { pickOne } from './game/lib/pick-one';
 import { loadAllLanguages, CHATTER_BOX } from './game/lib/chatter-box';
-import { AnimatedSprite } from './game/lib/animated-sprite';
+import { AnimatedSprite, AnimatedSpriteDirection } from './game/lib/animated-sprite';
 import { portalAnimations } from './game/animations/portal-animations';
 import { gobAnimations } from './game/animations/gob-animations';
 import { Mesh } from 'three';
@@ -36,13 +36,13 @@ const music = document.getElementById('music');
 
 let playerHasBeenSummoned = false;
 let isFighting = false;
-let documentsBeforePortal = 42;
+let documentsBeforePortal = 2;
 const travellingSpeed = 0.0005;
 const workingPower = 800;
 const moveStrength = 60;
 const printerStrength = 100;
 let suckStrength = 10.5;
-let playerSuckStrength = 28;
+let playerSuckStrength = 38;
 
 const gameState = {
     index: 0,
@@ -238,7 +238,7 @@ scene.add(backgroundPlate);
 const animations = playerAnimations;
 
 const playerSprite = new AnimatedSprite('assets/textures/buildings/isekaied-lawyer.png', 16, playerAnimations);
-playerSprite.setAnimation('iddleRight');
+playerSprite.setAnimation('iddle');
 const playerMesh = playerSprite.mesh;
 
 const gobs: AnimatedSprite[] = [];
@@ -256,6 +256,21 @@ window.addEventListener('click', (event) => {
 });
 
 loadSky();
+
+const officeDrones: AnimatedSprite[] = [];
+
+for (let i = 0; i < 0; i++) {
+    const officeDrone = new AnimatedSprite('assets/textures/buildings/isekaied-lawyer.png', 16, playerAnimations);
+    officeDrone.setAnimation('iddle');
+    officeDrone.mesh.position.copy(playerMesh.position);
+    officeDrone.mesh.position.z -= 0.01;
+    officeDrones.push(officeDrone);
+    officeDrone.mesh.userData.direction = Math.random() > 0.5 ? 1 : -1;
+    officeDrone.mesh.userData.speed = (Math.random() * 2 + 0.1) * 0.1;
+    officeDrone.mesh.position.x += Math.random() * 20 - 10;
+    officeDrone.setAnimation('running', (officeDrone.mesh.userData.direction === 1 ? AnimatedSpriteDirection.Right : AnimatedSpriteDirection.Left));
+    scene.add(officeDrone.mesh);
+}
 
 const portalSprite = new AnimatedSprite('assets/textures/buildings/isekaied-portal.png', 16, portalAnimations);
 const portalMesh = portalSprite.mesh;
@@ -283,7 +298,7 @@ let suck = false;
 let lastTime = performance.now();
 let sceneIsReady = false;
 let darken = 1;
-let lastVelocityDirection = '';
+let lastVelocityDirection = AnimatedSpriteDirection.Right;
 let playerIsIddle = false;
 function animate() {
     requestAnimationFrame(animate);
@@ -317,6 +332,27 @@ function animate() {
             summonsDocument.position.x = summonsDocument.userData.translation().x;
             summonsDocument.rotation.z = summonsDocument.userData.rotation();
         }
+    });
+
+    officeDrones.forEach((officeDrone) => {
+        officeDrone.update(now);
+        const currentOfficeDroneMesh = officeDrone.mesh;
+        currentOfficeDroneMesh.position.x += currentOfficeDroneMesh.userData.direction * currentOfficeDroneMesh.userData.speed;
+        const radius = 25;
+        if (officeDrone.mesh.userData.direction === -1) {
+            if (officeDrone.mesh.position.x < playerMesh.position.x - radius) {
+                officeDrone.mesh.position.x = playerMesh.position.x - radius;
+                officeDrone.mesh.userData.direction = 1;
+                officeDrone.setAnimation('running', AnimatedSpriteDirection.Right);
+            }
+        } else {
+            if (officeDrone.mesh.position.x > playerMesh.position.x + radius) {
+                officeDrone.mesh.position.x = playerMesh.position.x + radius;
+                officeDrone.mesh.userData.direction = -1;
+                officeDrone.setAnimation('running', AnimatedSpriteDirection.Left);
+            }
+        }
+        // currentOfficeDroneMesh.position.y += Math.random() * 0.5 - 0.25;
     });
 
     summonedThings.forEach((summonedThing) => {
@@ -411,13 +447,13 @@ function animate() {
             const body = playerMesh.userData;
             const velocity = body.linvel();
             if (Math.abs(velocity.x) < 0.01) {
-                playerSprite.setAnimation('iddle' + lastVelocityDirection);
+                playerSprite.setAnimation('iddle', lastVelocityDirection);
                 playerIsIddle = true;
             } else {
-                const direction: string = velocity.x > 0 ? 'Right' : 'Left';
+                const direction = velocity.x > 0 ? AnimatedSpriteDirection.Right : AnimatedSpriteDirection.Left;
                 if (lastVelocityDirection !== direction || playerIsIddle) {
                     playerIsIddle = false;
-                    playerSprite.setAnimation('walking' + direction);
+                    playerSprite.setAnimation('walking', direction);
                     lastVelocityDirection = direction;
                 }
             }

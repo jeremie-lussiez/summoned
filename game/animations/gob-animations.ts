@@ -11,19 +11,14 @@ export const gobAnimations: Record<string, SpriteAnimation> = {
         end: 2,
         speed: 100,
     },
-    'attackLeft': {
+    'attack': {
         start: 3,
         end: 4,
         speed: 200,
     },
-    'attackRight': {
-        start: 5,
-        end: 6,
-        speed: 200,
-    },
     'dead': {
-        start: 7,
-        end: 7,
+        start: 5,
+        end: 5,
         speed: 200000,
     },
 }
