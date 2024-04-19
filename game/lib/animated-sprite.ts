@@ -36,7 +36,6 @@ export class AnimatedSprite {
     public randomAnimation(): SpriteAnimation {
         const animations = Object.keys(this.animations);
         const animationId = animations[Math.floor(Math.random() * animations.length)];
-        console.log(animationId);
         return this.setAnimation(animationId);
     }
 
