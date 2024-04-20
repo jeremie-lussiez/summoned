@@ -5,23 +5,26 @@ export interface GameState {
     data: any;
     music?: string;
     transitions: GameStateTransition[];
-    actions: Record<string, (global: any, local: any) => void>;
-    init?: (global: any, local: any) => void;
-    reset?: (global: any, local: any) => void;
+    actions: Record<string, (gameData: any, stateData: any) => void>;
+    update?: (gameData: any, stateData: any, delta: number) => void;
+    init?: (gameData: any, stateData: any) => void;
+    reset?: (gameData: any, stateData: any) => void;
 }
 
 export interface GameStateTransition {
     target: string;
-    condition: (global: any, local: any) => boolean;
+    condition: (gameData: any, stateData: any) => boolean;
 }
 
 export class GameStateManager {
 
-    private data: any = {};
+    public data: any = {};
 
     private states: Record<string, GameState> = {};
 
-    private currentMusic: THREE.Audio;
+    private lastTime = performance.now();
+
+    private currentMusic: THREE.Audio | null;
     private jukebox: Record<string, THREE.Audio> = {};
 
     private audioListener = new THREE.AudioListener();
@@ -31,12 +34,13 @@ export class GameStateManager {
     public constructor(camera: THREE.Camera, data: any) {
         this.data = data;
         this.data.camera = camera;
+        this.data.audioListener = this.audioListener;
         this.data.camera.add(this.audioListener);
     }
 
     public addState(gameState: GameState): GameState {
         this.states[gameState.id] = gameState;
-        if (gameState.music) {
+        if (gameState.music && gameState.music.toLocaleUpperCase() !== 'STOP') {
             new THREE.AudioLoader().load(gameState.music, (buffer) => {
                 if (gameState.music) {
                     const stateMusic = new THREE.Audio(this.audioListener);
@@ -65,9 +69,22 @@ export class GameStateManager {
     }
 
     public checkTransitions(): void {
-        const transition = this.currentState.transitions.find(transition => transition.condition(this.data, this.currentState.data));
-        if (transition) {
-            this.setState(transition.target);
+        if (this.currentState) {
+            const transition = this.currentState.transitions.find(transition => transition.condition(this.data, this.currentState.data));
+            if (transition) {
+                this.setState(transition.target);
+            }
+        }
+    }
+
+    public update(): void {
+        const now = performance.now();
+        const delta = now - this.lastTime;
+        this.lastTime = now;
+        if (this.currentState) {
+            if (this.currentState.update) {
+                this.currentState.update(this.data, this.currentState.data, delta);
+            }
         }
     }
 
@@ -78,6 +95,10 @@ export class GameStateManager {
     }
 
     private tryPlayingMusic(music: string): void {
+        if (music.toLocaleUpperCase() === 'STOP') {
+            this.currentMusic = null;
+            return;
+        }
         if (this.jukebox[music]) {
             this.currentMusic = this.jukebox[music];
             this.currentMusic.play();

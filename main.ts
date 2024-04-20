@@ -14,6 +14,13 @@ import { SKYSCRAPER_TEXTURES, createSkyscraper } from './game/scenery/skyline';
 import { stuffList } from './game/animations/stuff-list';
 import { GameStateManager } from './game/lib/game-state-manager';
 import { loadSky } from './game/scenery/sky';
+import { INTRO_STATE_DEFINITION } from './game/states/intro';
+import { AT_WORK_STATE_DEFINITION } from './game/states/at-work';
+import { WORKING_STATE_DEFINITION } from './game/states/working';
+import { SUMMONED_BY_PORTAL_STATE_DEFINITION } from './game/states/summoned-by-portal';
+import { FIGHTING_GOBLINS_STATE_DEFINITION } from './game/states/fighting-goblins';
+import { createClock, updateClock } from './game/scenery/clock';
+import { HAS_BEEN_SUMMONED_STATE_DEFINITION } from './game/states/has-been-summoned';
 
 RapierGroupFactory.createGroup('ground');
 RapierGroupFactory.createGroup('player');
@@ -32,14 +39,8 @@ const music = document.getElementById('music');
 
 let playerHasBeenSummoned = false;
 let isFighting = false;
-let documentsBeforePortal = 10;
 const travellingSpeed = 0.005;
-const workingPower = 800;
 const moveStrength = 60;
-const printerStrength = 100;
-let suckStrength = 1.5;
-let playerSuckStrength = 38;
-let sceneIsReady = false;
 
 
 const scene = new THREE.Scene();
@@ -57,13 +58,13 @@ camera.position.y = 160;
 camera.position.z = 400;
 camera.position.x = 10;
 
-
-
 const stateManager = new GameStateManager(
     camera,
     {
+        scene: scene,
+        suckableThings: [] as Mesh[],
         currentDocumentProgression: 0,
-        documentsBeforePortal: 5,
+        documentsBeforePortal: 1,
         completedDocuments: 0,
         obeyDiv: document.getElementById('obey') as HTMLDivElement,
         summonsTextDiv: document.getElementById('summons') as HTMLDivElement,
@@ -74,132 +75,13 @@ const stateManager = new GameStateManager(
     }
 );
 
-const ENDING_STATE = stateManager.addState({
-    id: 'ending',
-    music: 'assets/audio/9to5Blues.mp3',
-    data: {
-        isFighting: false,
-        playerHasBeenSummoned: false,
-        documentsBeforePortal: 5,
-    },
-    init: (global: any, local: any) => {
-        local.isFighting = false;
-        local.playerHasBeenSummoned = false;
-        local.documentsBeforePortal = 5;
-    },
-    actions: {},
-    transitions: [
-        {
-            target: 'atWork',
-            condition: (global: any, local: any) => {
-                return global.camera.position.z <= 1.8;
-            }
-        }
-    ]
-});
+const INTRO_STATE = stateManager.addState(INTRO_STATE_DEFINITION);
+const AT_WORK_STATE = stateManager.addState(AT_WORK_STATE_DEFINITION);
+const WORKING_STATE = stateManager.addState(WORKING_STATE_DEFINITION);
+const SUMMONED_BY_PORTAL_STATE = stateManager.addState(SUMMONED_BY_PORTAL_STATE_DEFINITION);
+const FIGHTING_GOBLINS_STATE = stateManager.addState(FIGHTING_GOBLINS_STATE_DEFINITION);
+const HAS_BEEN_SUMMONED_STATE = stateManager.addState(HAS_BEEN_SUMMONED_STATE_DEFINITION);
 
-const INTRO_STATE = stateManager.addState({
-    id: 'intro',
-    data: {},
-    actions: {},
-    transitions: [
-        {
-            target: 'atWork',
-            condition: (global: any, local: any) => {
-                return global.camera.position.z <= 1.8;
-            }
-        }
-    ]
-});
-
-const AT_WORK_STATE = stateManager.addState({
-    id: 'atWork',
-    music: 'assets/audio/song.mp3',
-    data: {},
-    actions: {
-        work() {
-            stateManager.setState(WORKING_STATE.id);
-        }
-    },
-    init: (global: any, local: any) => {
-        global.summonsTextDiv.style.display = 'block';
-        global.progressDiv.style.display = 'block';
-        global.obeyDiv.innerText = 'Draft summons !';
-        global.obeyDiv.style.display = 'block';
-        sceneIsReady = true;
-    },
-    transitions: []
-});
-
-const WORKING_STATE = stateManager.addState({
-    id: 'working',
-    data: {
-        currentDocumentDifficulty: 5000,
-    },
-    actions: {
-        work(global: any, local: any) {
-            if (global.currentDocumentProgression >= local.currentDocumentDifficulty) {
-                global.completedDocuments += 1;
-                global.currentDocumentProgression = 0;
-                local.currentDocumentDifficulty = Math.random() * 10000 + 2000;
-                global.summonsTextDiv.innerText = `Summons: ${global.completedDocuments}`;
-                global.progressChildDiv.style.width = '0%';
-            } else {
-                global.currentDocumentProgression += (workingPower * Math.random() / 2) + workingPower / 2;
-                global.currentDocumentProgression = Math.min(global.currentDocumentProgression, local.currentDocumentDifficulty);
-                global.progressChildDiv.style.width = `${(global.currentDocumentProgression / local.currentDocumentDifficulty) * 100}%`;
-            }
-        }
-    },
-    init: (global: any, local: any) => {
-        global.obeyDiv.style.display = 'none';
-    },
-    transitions: [
-        {
-            target: 'summoned',
-            condition: (global: any, local: any) => {
-                return global.completedDocuments >= global.documentsBeforePortal;
-            }
-        }
-    ]
-});
-
-const SUMMONED_STATE = stateManager.addState({
-    id: 'summoned',
-    data: {
-        isFighting: false,
-        playerHasBeenSummoned: false,
-        documentsBeforePortal: 5,
-    },
-    actions: {},
-    init: (global: any, local: any) => {
-        local.isFighting = false;
-        local.playerHasBeenSummoned = false;
-        local.documentsBeforePortal = 5;
-    },
-    transitions: [
-    ]
-});
-
-const FIGHTING_GOBLINS_STATE = stateManager.addState({
-    id: 'fightingGoblins',
-    music: 'assets/audio/Goblinbane.mp3',
-    data: {
-        isFighting: false,
-        playerHasBeenSummoned: false,
-        documentsBeforePortal: 5,
-    },
-    actions: {},
-    init: (global: any, local: any) => {
-        local.isFighting = false;
-        local.playerHasBeenSummoned = false;
-        local.documentsBeforePortal = 5;
-    },
-    transitions: [
-    ]
-});
-
-stateManager.setState(INTRO_STATE.id);
 
 const audioListener = new THREE.AudioListener();
 camera.add(audioListener);
@@ -232,18 +114,6 @@ new THREE.AudioLoader().load('assets/audio/hurt.mp3', (buffer) => {
     hurtSound.setVolume(0.5);
 });
 
-let printerSoundIndex = 0;
-const printerSounds: THREE.Audio[] = [];
-
-for (let i = 0; i < 10; i++) {
-    new THREE.AudioLoader().load('assets/audio/printer.mp3', (buffer) => {
-        const printerSound: THREE.Audio = new THREE.Audio(audioListener);
-        printerSound.setBuffer(buffer);
-        printerSound.setLoop(false);
-        printerSound.setVolume(0.20);
-        printerSounds.push(printerSound);
-    });
-}
 
 window.addEventListener('resize', () => {
     updateCamera();
@@ -294,32 +164,16 @@ roomMesh.position.y = jamesonBuildingLastFloor - 34;
 roomMesh.position.z = -20;
 scene.add(roomMesh);
 
-const smallHandMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-const smallHandGeometry = new THREE.PlaneGeometry(0.5, 2, 1, 1);
-const bigHandMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-const bigHandGeometry = new THREE.PlaneGeometry(0.5, 3, 1, 1);
-const smallHandMesh = new THREE.Mesh(smallHandGeometry, smallHandMaterial);
-const bigHandMesh = new THREE.Mesh(bigHandGeometry, bigHandMaterial);
+stateManager.data.roomPosition = roomMesh.position;
+stateManager.data.roomMesh = roomMesh;
 
-bigHandMesh.position.y = 1;
-smallHandMesh.position.y = 0.5;
 
-const bigHandPivot = new THREE.Object3D();
-bigHandPivot.position.copy(roomMesh.position);
-bigHandPivot.position.z += 0.004;
-bigHandPivot.position.x += 17;
-bigHandPivot.position.y -= 9;
-bigHandPivot.add(bigHandMesh);
-
-const smallHandPivot = new THREE.Object3D();
-smallHandPivot.position.copy(roomMesh.position);
-smallHandPivot.position.z += 0.005;
-smallHandPivot.position.x += 17;
-smallHandPivot.position.y -= 9;
-smallHandPivot.add(smallHandMesh);
-
-scene.add(bigHandPivot);
-scene.add(smallHandPivot);
+const clock = createClock();
+clock.position.copy(roomMesh.position);
+clock.position.z += 0.004;
+clock.position.x += 17;
+clock.position.y -= 9;
+scene.add(clock);
 
 const backgroundPlate = new THREE.Mesh(new THREE.PlaneGeometry(10000, 10000, 1, 1), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.0, side: THREE.DoubleSide }));
 backgroundPlate.position.copy(roomMesh.position);
@@ -340,6 +194,8 @@ playerMesh.position.x += 3;
 playerMesh.position.y -= 22;
 scene.add(playerMesh);
 
+stateManager.data.playerMesh = playerMesh;
+
 let start = false;
 let zoomInStart = 0;
 window.addEventListener('click', (event) => {
@@ -347,21 +203,6 @@ window.addEventListener('click', (event) => {
 });
 
 loadSky();
-
-const officeDrones: AnimatedSprite[] = [];
-
-for (let i = 0; i < 0; i++) {
-    const officeDrone = new AnimatedSprite('assets/textures/buildings/isekaied-lawyer.png', 16, playerAnimations);
-    officeDrone.setAnimation('iddle');
-    officeDrone.mesh.position.copy(playerMesh.position);
-    officeDrone.mesh.position.z -= 0.01;
-    officeDrones.push(officeDrone);
-    officeDrone.mesh.userData.direction = Math.random() > 0.5 ? 1 : -1;
-    officeDrone.mesh.userData.speed = (Math.random() * 2 + 0.1) * 0.1;
-    officeDrone.mesh.position.x += Math.random() * 20 - 10;
-    officeDrone.setAnimation('running', (officeDrone.mesh.userData.direction === 1 ? AnimatedSpriteDirection.Right : AnimatedSpriteDirection.Left));
-    scene.add(officeDrone.mesh);
-}
 
 const portalSprite = new AnimatedSprite('assets/textures/buildings/isekaied-portal.png', 16, portalAnimations);
 const portalMesh = portalSprite.mesh;
@@ -378,16 +219,15 @@ portalMesh.position.z += 0.02;
 portalMesh.position.x += 2;
 portalMesh.rotation.z = Math.PI * 0.5;
 portalMesh.visible = false;
+stateManager.data.portalMesh = portalMesh;
 scene.add(portalMesh);
 
 
 const summonsDocuments: THREE.Mesh[] = [];
 const summonedThings: THREE.Mesh[] = [];
-const summonsDocumentGeometry = new THREE.PlaneGeometry(3, 0.5, 1, 1);
 
 let suck = false;
 let lastTime = performance.now();
-let darken = 1;
 let lastVelocityDirection = AnimatedSpriteDirection.Right;
 let playerIsIddle = false;
 function animate() {
@@ -401,49 +241,9 @@ function animate() {
 
     // summonsDocumentMaterial.opacity = dayCycleOpacity;
 
-    if (suck) {
-        roomMesh.material.opacity = darken;
-        darken -= delta * 0.0005;
-        darken = Math.max(0, Math.min(1, darken));
-    }
+    updateClock(clock, now * 0.00001);
 
-    summonsDocuments.forEach((summonsDocument) => {
-        const distanceToPortal = portalMesh.position.distanceTo(summonsDocument.position);
-        if (distanceToPortal < 10) {
-            summonsDocument.material.opacity = 1 - distanceToPortal / 10;
-        } else {
-            summonsDocument.material.opacity = 1;
-        }
-        if (distanceToPortal < 3) {
-            summonsDocument.visible = false;
-        }
-        if (summonsDocument.userData) {
-            summonsDocument.position.y = summonsDocument.userData.translation().y;
-            summonsDocument.position.x = summonsDocument.userData.translation().x;
-            summonsDocument.rotation.z = summonsDocument.userData.rotation();
-        }
-    });
-
-    officeDrones.forEach((officeDrone) => {
-        officeDrone.update(now);
-        const currentOfficeDroneMesh = officeDrone.mesh;
-        currentOfficeDroneMesh.position.x += currentOfficeDroneMesh.userData.direction * currentOfficeDroneMesh.userData.speed;
-        const radius = 25;
-        if (officeDrone.mesh.userData.direction === -1) {
-            if (officeDrone.mesh.position.x < playerMesh.position.x - radius) {
-                officeDrone.mesh.position.x = playerMesh.position.x - radius;
-                officeDrone.mesh.userData.direction = 1;
-                officeDrone.setAnimation('running', AnimatedSpriteDirection.Right);
-            }
-        } else {
-            if (officeDrone.mesh.position.x > playerMesh.position.x + radius) {
-                officeDrone.mesh.position.x = playerMesh.position.x + radius;
-                officeDrone.mesh.userData.direction = -1;
-                officeDrone.setAnimation('running', AnimatedSpriteDirection.Left);
-            }
-        }
-        // currentOfficeDroneMesh.position.y += Math.random() * 0.5 - 0.25;
-    });
+    stateManager.update();
 
     summonedThings.forEach((summonedThing) => {
         if (summonedThing.userData) {
@@ -471,6 +271,13 @@ function animate() {
             playerMesh.material.opacity = 1;
         }
     }
+
+    if (playerMesh.userData?.translation) {
+        playerMesh.position.y = playerMesh.userData.translation().y;
+        playerMesh.position.x = playerMesh.userData.translation().x;
+        playerMesh.rotation.z = playerMesh.userData.rotation();
+    }
+
 
     portalSprite.update(now);
     playerSprite.update(now);
@@ -523,9 +330,6 @@ function animate() {
             buildingMesh.visible = false;
         });
     }*/
-
-    bigHandPivot.rotation.z -= delta * 0.0002;
-    smallHandPivot.rotation.z -= delta * 0.0002 / (Math.PI * 4);
 
     if (isFighting) {
         camera.position.x = playerMesh.position.x;
@@ -597,6 +401,9 @@ RAPIER.init().then(() => {
     let gravity = { x: 0.0, y: -9.81 };
     world = new RAPIER.World(gravity);
 
+    stateManager.data.world = world;
+    stateManager.setState(INTRO_STATE.id);
+
     // const debugMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff });
     // const debugGeometry = new THREE.PlaneGeometry(120, 4, 1, 1);
     // const debugMesh = new THREE.Mesh(debugGeometry, debugMaterial);
@@ -626,7 +433,6 @@ RAPIER.init().then(() => {
     const ceilingRigidBody = world.createRigidBody(ceilingRigidBodyDesc);
     const ceilingColliderDesc = RAPIER.ColliderDesc
         .cuboid(60, 2)
-        // .setCollisionGroups(0x00010007)
         .setCollisionGroups(RapierGroupFactory.composeGroups(['ground']))
         .setRestitution(0.4);
     ceilingCollider = world.createCollider(ceilingColliderDesc, ceilingRigidBody);
@@ -655,6 +461,24 @@ RAPIER.init().then(() => {
         .setRestitution(0.4);
     rightWallCollider = world.createCollider(rightWallColliderDesc, rightWallRigidBody);
 
+    stateManager.data.leftWallCollider = leftWallCollider;
+    stateManager.data.rightWallCollider = rightWallCollider;
+    stateManager.data.ceilingCollider = ceilingCollider;
+
+
+    const playerRigidBodyDesc = RAPIER.RigidBodyDesc
+        .dynamic()
+        .setTranslation(playerMesh.position.x, playerMesh.position.y)
+        .setLinearDamping(0.5)
+        .setCcdEnabled(true);
+    const playerRigidBody = world.createRigidBody(playerRigidBodyDesc);
+    const playerColliderDesc = RAPIER.ColliderDesc
+        .cuboid(4, 8)
+        .setCollisionGroups(RapierGroupFactory.composeGroups(['player'], ['ground']))
+        .setRestitution(0.5);
+    const playerCollider = world.createCollider(playerColliderDesc, playerRigidBody);
+    playerMesh.userData = playerRigidBody;
+
     let lastPhysicsTime = performance.now();
     const timeScale = 1.0;
 
@@ -663,62 +487,7 @@ RAPIER.init().then(() => {
         world.timestep = (currentTime - lastPhysicsTime) / 1000.0 * timeScale;
         lastPhysicsTime = currentTime;
 
-        if (suck) {
-            summonsDocuments.forEach((mesh) => {
-                if (mesh.userData) {
-                    const body = mesh.userData as RAPIER.RigidBody;
-                    let suckAngle = Math.atan2(
-                        portalMesh.position.y - body.translation().y,
-                        portalMesh.position.x - body.translation().x
-                    );
-                    let suckForce = {
-                        x: Math.cos(suckAngle) * suckStrength,
-                        y: Math.sin(suckAngle) * suckStrength
-                    };
-                    body.applyImpulse(suckForce, true);
-                    let distance = Math.sqrt(
-                        Math.pow(portalMesh.position.x - body.translation().x, 2) +
-                        Math.pow(portalMesh.position.y - body.translation().y, 2)
-                    );
-                    if (distance < 5) {
-                        world.removeCollider(body.collider(0), true);
-                        world.removeRigidBody(body);
-                        mesh.visible = false;
-                        mesh.userData = null;
-                    }
-                }
-            });
-
-            if (playerMesh.userData && !isFighting) {
-                const body = playerMesh.userData;
-                let suckAngle = Math.atan2(
-                    portalMesh.position.y - body.translation().y,
-                    portalMesh.position.x - body.translation().x
-                );
-                let suckForce = {
-                    x: Math.cos(suckAngle) * playerSuckStrength,
-                    y: Math.sin(suckAngle) * playerSuckStrength
-                };
-                let distance = Math.sqrt(
-                    Math.pow(portalMesh.position.x - body.translation().x, 2) +
-                    Math.pow(portalMesh.position.y - body.translation().y, 2)
-                ) - 8;
-                if (distance < 0) {
-                    // world.removeRigidBody(body);
-                    playerHasBeenSummoned = true;
-                    // playerMesh.userData = null;
-                    obeyDiv.style.display = 'block';
-                    obeyDiv.innerText = 'YOU have been summoned !';
-                    // backgroundPlate.material.opacity = 0;
-                    smallHandMesh.visible = false;
-                    bigHandMesh.visible = false;
-                }
-                if (body) {
-                    body.applyImpulse(suckForce, true);
-                }
-            }
-
-        }
+        stateManager.action('suck');
 
         gobs.forEach((gob) => {
             if (gob.mesh.userData) {
@@ -816,54 +585,6 @@ RAPIER.init().then(() => {
     gameLoop();
 });
 
-const createSummonsDocument = (documentNumber: number): void => {
-    const name = 'Jameson, Jameson, Jameson & Partners';
-    const futureOffset = 3600 * 24 * 365 * 1000 * 10;
-    const date = new Date(Date.now() + (3600 * 1000 * 24 * documentNumber) + futureOffset).toLocaleDateString();
-    const time = `${Math.floor(Math.random() * 24).toString().padStart(2, '0')}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`;
-    const place = pickOne(summonsPlaces);
-    const reason = pickOne(summonsReasons);
-
-    window.setTimeout(() => {
-        const summonsDocumentMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
-        const summonsDocumentMesh = new THREE.Mesh(summonsDocumentGeometry, summonsDocumentMaterial);
-        summonsDocumentMesh.position.copy(roomMesh.position);
-        summonsDocumentMesh.position.z += 0.2;
-        summonsDocumentMesh.position.x += 20;
-        summonsDocumentMesh.position.y -= 24;
-        scene.add(summonsDocumentMesh);
-        const summonsDocumentRigidBodyDesc = RAPIER.RigidBodyDesc
-            .dynamic()
-            .setTranslation(summonsDocumentMesh.position.x, summonsDocumentMesh.position.y)
-            .setLinearDamping(0.55)
-            .setCcdEnabled(true);
-        const summonsDocumentRigidBody = world.createRigidBody(summonsDocumentRigidBodyDesc);
-        const summonsDocumentColliderDesc = RAPIER.ColliderDesc
-            .cuboid(1.5, 0.25)
-            .setCollisionGroups(RapierGroupFactory.composeGroups(['summonsDocuments'], ['ground', 'summonsDocuments']))
-            .setRestitution(0.5);
-        const summonsDocumentCollider = world.createCollider(summonsDocumentColliderDesc, summonsDocumentRigidBody);
-        summonsDocumentMesh.userData = summonsDocumentRigidBody;
-        summonsDocumentMesh.collider = summonsDocumentCollider;
-
-        const printerImpulse = { x: -printerStrength, y: 10 };
-        summonsDocumentRigidBody.applyImpulse(printerImpulse, true);
-
-        summonsDocuments.push(summonsDocumentMesh);
-    }, 2000);
-
-    const text = `We, ${name}, hereby summon you to appear before the court on ${date} at ${time} in ${place} to answer the following charges: ${reason}. Failure to appear will result in a warrant for your arrest.`;
-
-    summonsDocumentTextDiv.innerText = text;
-    summonsContainerDiv.style.display = 'block';
-}
-
-let currentDocument = {
-    progression: 0,
-    documentNumber: 0,
-    difficulty: 6000,
-};
-
 mousePlane.position.z = roomMesh.position.z;
 
 const raycaster = new THREE.Raycaster();
@@ -925,7 +646,6 @@ addEventListener('click', (event) => {
 
         const cameraTarget = camera.position.z + 20;
 
-        // 0x00010007
         leftWallCollider.setCollisionGroups(0x00000000);
         rightWallCollider.setCollisionGroups(0x00000000);
         ceilingCollider.setCollisionGroups(0x00000000);
@@ -979,8 +699,6 @@ addEventListener('click', (event) => {
     }
 
     if (isFighting) {
-
-        obeyDiv.style.display = 'none';
 
         pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
         pointer.y = - (event.clientY / window.innerHeight) * 2 + 1;
@@ -1047,38 +765,8 @@ loadAllLanguages().then(() => {
             isTyping = true;
             playerSprite.setAnimation('typing');
         }
-        if (currentDocument.progression >= currentDocument.difficulty) {
-            printerSoundIndex = (printerSoundIndex + 1) % printerSounds.length;
-            printerSounds[printerSoundIndex].play();
-            createSummonsDocument(currentDocument.documentNumber);
-            currentDocument = {
-                progression: 0,
-                documentNumber: currentDocument.documentNumber + 1,
-                difficulty: Math.random() * 10000 + 2000,
-            };
 
-            if (currentDocument.documentNumber >= documentsBeforePortal) {
-                // summonsContainerDiv.style.display = 'none';
-                portalMesh.visible = true;
-                playerSprite.setAnimation('falling');
-
-                const playerRigidBodyDesc = RAPIER.RigidBodyDesc
-                    .dynamic()
-                    .setTranslation(playerMesh.position.x, playerMesh.position.y)
-                    .setLinearDamping(0.5)
-                    .setCcdEnabled(true);
-                const playerRigidBody = world.createRigidBody(playerRigidBodyDesc);
-                const playerColliderDesc = RAPIER.ColliderDesc
-                    .cuboid(4, 8)
-                    .setCollisionGroups(RapierGroupFactory.composeGroups(['player'], ['ground']))
-                    .setRestitution(0.5);
-                const playerCollider = world.createCollider(playerColliderDesc, playerRigidBody);
-                playerMesh.userData = playerRigidBody;
-
-                suck = true;
-            }
-
-        }
+        // createSummonsDocument(currentDocument.documentNumber);
         stateManager.action('work');
         stateManager.checkTransitions();
     }
