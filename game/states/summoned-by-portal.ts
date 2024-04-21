@@ -30,7 +30,7 @@ export const SUMMONED_BY_PORTAL_STATE_DEFINITION = {
                         // game.world.removeCollider(body.collider(0), true);
                         // game.world.removeRigidBody(body);
                         mesh.visible = false;
-                        mesh.userData = null;
+                        // mesh.userData = null;
                     }
                 }
             });
@@ -42,20 +42,24 @@ export const SUMMONED_BY_PORTAL_STATE_DEFINITION = {
         game.roomMesh.material.opacity = state.darken;
         state.darken -= delta * 0.0005;
         state.darken = Math.max(0, Math.min(1, state.darken));
-        game.suckableThings.forEach((summonsDocument) => {
-            const distanceToPortal = game.portalMesh.position.distanceTo(summonsDocument.position);
+        if (state.darken === 0) {
+            game.clock.visible = false;
+
+        }
+        game.suckableThings.forEach((suckable) => {
+            const distanceToPortal = game.portalMesh.position.distanceTo(suckable.position);
             if (distanceToPortal < 10) {
-                summonsDocument.material.opacity = 1 - distanceToPortal / 10;
+                suckable.opacity = 1 - distanceToPortal / 10;
             } else {
-                summonsDocument.material.opacity = 1;
+                suckable.opacity = 1;
             }
             if (distanceToPortal < 3) {
-                summonsDocument.visible = false;
+                suckable.visible = false;
             }
-            if (summonsDocument.userData) {
-                summonsDocument.position.y = summonsDocument.userData.translation().y;
-                summonsDocument.position.x = summonsDocument.userData.translation().x;
-                summonsDocument.rotation.z = summonsDocument.userData.rotation();
+            if (suckable.userData) {
+                suckable.position.y = suckable.userData.translation().y;
+                suckable.position.x = suckable.userData.translation().x;
+                suckable.rotation.z = suckable.userData.rotation();
             }
         });
     },
@@ -67,6 +71,9 @@ export const SUMMONED_BY_PORTAL_STATE_DEFINITION = {
         if (!game.suckableThings.find(mesh => mesh === game.playerMesh)) {
             game.suckableThings.push(game.playerMesh);
         }
+        window.setTimeout(() => {
+            game.playerSprite.setAnimation('falling');
+        }, 1000);
     },
     transitions: [
         {

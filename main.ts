@@ -1,13 +1,9 @@
 import * as THREE from 'three';
 import RAPIER, { ActiveEvents, Collider } from '@dimforge/rapier2d-compat';
 import { playerAnimations } from './game/animations/player-animations';
-import { summonsReasons } from './game/lists/summons-reasons';
-import { summonsPlaces } from './game/lists/summons-places';
-import { pickOne } from './game/lib/pick-one';
 import { loadAllLanguages, CHATTER_BOX } from './game/lib/chatter-box';
 import { AnimatedSprite, AnimatedSpriteDirection } from './game/lib/animated-sprite';
 import { portalAnimations } from './game/animations/portal-animations';
-import { gobAnimations } from './game/animations/gob-animations';
 import { Mesh } from 'three';
 import { RapierGroupFactory } from './game/lib/rapier-group-factory';
 import { SKYSCRAPER_TEXTURES, createSkyscraper } from './game/scenery/skyline';
@@ -35,13 +31,8 @@ export class PhysicsGameSpriteEntity {
     public collider: RAPIER.Collider;
 }
 
-const music = document.getElementById('music');
-
-let playerHasBeenSummoned = false;
 let isFighting = false;
-const travellingSpeed = 0.005;
 const moveStrength = 60;
-
 
 const scene = new THREE.Scene();
 
@@ -64,7 +55,7 @@ const stateManager = new GameStateManager(
         scene: scene,
         suckableThings: [] as Mesh[],
         currentDocumentProgression: 0,
-        documentsBeforePortal: 1,
+        documentsBeforePortal: 42,
         completedDocuments: 0,
         obeyDiv: document.getElementById('obey') as HTMLDivElement,
         summonsTextDiv: document.getElementById('summons') as HTMLDivElement,
@@ -79,9 +70,8 @@ const INTRO_STATE = stateManager.addState(INTRO_STATE_DEFINITION);
 const AT_WORK_STATE = stateManager.addState(AT_WORK_STATE_DEFINITION);
 const WORKING_STATE = stateManager.addState(WORKING_STATE_DEFINITION);
 const SUMMONED_BY_PORTAL_STATE = stateManager.addState(SUMMONED_BY_PORTAL_STATE_DEFINITION);
-const FIGHTING_GOBLINS_STATE = stateManager.addState(FIGHTING_GOBLINS_STATE_DEFINITION);
 const HAS_BEEN_SUMMONED_STATE = stateManager.addState(HAS_BEEN_SUMMONED_STATE_DEFINITION);
-
+const FIGHTING_GOBLINS_STATE = stateManager.addState(FIGHTING_GOBLINS_STATE_DEFINITION);
 
 const audioListener = new THREE.AudioListener();
 camera.add(audioListener);
@@ -114,7 +104,6 @@ new THREE.AudioLoader().load('assets/audio/hurt.mp3', (buffer) => {
     hurtSound.setVolume(0.5);
 });
 
-
 window.addEventListener('resize', () => {
     updateCamera();
 }, false);
@@ -122,7 +111,8 @@ window.addEventListener('resize', () => {
 const buildingsMeshes: Mesh[] = [];
 
 for (let i = 0; i < 200; i++) {
-    const texture = SKYSCRAPER_TEXTURES[Math.floor(Math.random() * SKYSCRAPER_TEXTURES.length - 1) + 1];
+    const index = Math.floor(Math.random() * (SKYSCRAPER_TEXTURES.length - 1)) + 1;
+    const texture = SKYSCRAPER_TEXTURES[index];
     const x = Math.random() * 2000 - 1000;
     const z = Math.random() * 1000 - 500;
     const y = -z;
@@ -133,6 +123,7 @@ for (let i = 0; i < 200; i++) {
 const jamesonBuildingLastFloor = 210;
 const jamesonBuildingMesh = createSkyscraper(scene, SKYSCRAPER_TEXTURES[0], 0, jamesonBuildingLastFloor, 0);
 buildingsMeshes.push(jamesonBuildingMesh);
+stateManager.data.jamesonBuildingMesh = jamesonBuildingMesh;
 
 const skyMesh = loadSky();
 scene.add(skyMesh);
@@ -167,24 +158,26 @@ scene.add(roomMesh);
 stateManager.data.roomPosition = roomMesh.position;
 stateManager.data.roomMesh = roomMesh;
 
-
 const clock = createClock();
 clock.position.copy(roomMesh.position);
 clock.position.z += 0.004;
 clock.position.x += 17;
 clock.position.y -= 9;
 scene.add(clock);
+stateManager.data.clock = clock;
 
 const backgroundPlate = new THREE.Mesh(new THREE.PlaneGeometry(10000, 10000, 1, 1), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.0, side: THREE.DoubleSide }));
 backgroundPlate.position.copy(roomMesh.position);
 backgroundPlate.position.z -= 1;
 scene.add(backgroundPlate);
+stateManager.data.backgroundPlate = backgroundPlate;
 
 const animations = playerAnimations;
 
 const playerSprite = new AnimatedSprite('assets/textures/buildings/isekaied-lawyer.png', 16, playerAnimations);
 playerSprite.setAnimation('iddle');
 const playerMesh = playerSprite.mesh;
+stateManager.data.playerSprite = playerSprite;
 
 const gobs: AnimatedSprite[] = [];
 
@@ -195,12 +188,6 @@ playerMesh.position.y -= 22;
 scene.add(playerMesh);
 
 stateManager.data.playerMesh = playerMesh;
-
-let start = false;
-let zoomInStart = 0;
-window.addEventListener('click', (event) => {
-    start = true;
-});
 
 loadSky();
 
@@ -222,11 +209,8 @@ portalMesh.visible = false;
 stateManager.data.portalMesh = portalMesh;
 scene.add(portalMesh);
 
-
-const summonsDocuments: THREE.Mesh[] = [];
 const summonedThings: THREE.Mesh[] = [];
 
-let suck = false;
 let lastTime = performance.now();
 let lastVelocityDirection = AnimatedSpriteDirection.Right;
 let playerIsIddle = false;
@@ -234,12 +218,7 @@ function animate() {
     requestAnimationFrame(animate);
     renderer.render(scene, camera);
     const now = performance.now();
-    const delta = now - lastTime;
     lastTime = now;
-
-    // const dayCycleOpacity = (Math.sin(now * 0.0005) * 0.5 + 0.5) * 0.9 + 0.1;
-
-    // summonsDocumentMaterial.opacity = dayCycleOpacity;
 
     updateClock(clock, now * 0.00001);
 
@@ -253,83 +232,15 @@ function animate() {
         }
     });
 
-    if (playerMesh.userData) {
-        if (suck && !isFighting) {
-            playerMesh.position.y = playerMesh.userData.translation().y;
-            playerMesh.position.x = playerMesh.userData.translation().x;
-            playerMesh.rotation.z = playerMesh.userData.rotation();
-            const distanceToPortal = portalMesh.position.distanceTo(playerMesh.position) - 8;
-            if (distanceToPortal < 5) {
-                playerMesh.material.opacity = distanceToPortal / 5;
-            } else {
-                playerMesh.material.opacity = 1;
-            }
-        } else if (isFighting) {
-            playerMesh.position.y = playerMesh.userData.translation().y;
-            playerMesh.position.x = playerMesh.userData.translation().x;
-            playerMesh.rotation.z = playerMesh.userData.rotation();
-            playerMesh.material.opacity = 1;
-        }
-    }
-
     if (playerMesh.userData?.translation) {
         playerMesh.position.y = playerMesh.userData.translation().y;
         playerMesh.position.x = playerMesh.userData.translation().x;
         playerMesh.rotation.z = playerMesh.userData.rotation();
     }
 
-
     portalSprite.update(now);
     playerSprite.update(now);
     playerPortalSprite.update(now);
-
-    gobs.forEach((gob) => {
-        gob.update(now);
-        const currentGobMesh = gob.mesh;
-        if (currentGobMesh.userData) {
-            const body = currentGobMesh.userData;
-
-            currentGobMesh.position.y = body.translation().y;
-            currentGobMesh.position.x = body.translation().x;
-            currentGobMesh.rotation.z = body.rotation();
-
-            if (!gob.mesh.isDead) {
-                const velocity = body.linvel();
-                if (Math.abs(velocity.x) < 0.01) {
-                    gob.setAnimation('iddle');
-                } else {
-                    gob.setAnimation('walking');
-                }
-            }
-        }
-    });
-
-    if (!start) {
-        zoomInStart = now;
-    }
-
-    if (camera.position.z > 1.8 && !isFighting && !playerHasBeenSummoned) {
-        camera.position.z = (Math.cos((now - zoomInStart) * travellingSpeed) * 250 + 250) - 1;
-        const distance = camera.position.z;
-        const opacityDistanceThreshold = 80;
-        if (distance < opacityDistanceThreshold) {
-            jamesonBuildingMesh.material.opacity = distance / opacityDistanceThreshold;
-            jamesonBuildingMesh.children[0].material.opacity = distance / opacityDistanceThreshold;
-            backgroundPlate.material.opacity = 1 - distance / opacityDistanceThreshold;
-        } else {
-            jamesonBuildingMesh.material.opacity = 1;
-            jamesonBuildingMesh.children[0].material.opacity = 1;
-            backgroundPlate.material.opacity = 0;
-        }
-    }/* else if (stateManager.currentState === INTRO_STATE) {
-        music.volume = 0.2;
-        music.play();
-        sceneIsReady = true;
-
-        buildingsMeshes.forEach((buildingMesh) => {
-            buildingMesh.visible = false;
-        });
-    }*/
 
     if (isFighting) {
         camera.position.x = playerMesh.position.x;
@@ -366,6 +277,7 @@ groundMesh.position.z -= 0.01;
 groundMesh.position.y -= 46;
 groundMesh.visible = false;
 scene.add(groundMesh);
+stateManager.data.groundMesh = groundMesh;
 
 let leftWallCollider;
 let rightWallCollider;
@@ -403,15 +315,6 @@ RAPIER.init().then(() => {
 
     stateManager.data.world = world;
     stateManager.setState(INTRO_STATE.id);
-
-    // const debugMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff });
-    // const debugGeometry = new THREE.PlaneGeometry(120, 4, 1, 1);
-    // const debugMesh = new THREE.Mesh(debugGeometry, debugMaterial);
-    // debugMesh.position.copy(roomMesh.position);
-    // debugMesh.position.z += 0.02;
-    // debugMesh.position.y += 2;
-    // debugMesh.position.x += 0;
-    // scene.add(debugMesh);
 
     const groundRigidBodyDesc = RAPIER.RigidBodyDesc
         .fixed()
@@ -488,19 +391,6 @@ RAPIER.init().then(() => {
         lastPhysicsTime = currentTime;
 
         stateManager.action('suck');
-
-        gobs.forEach((gob) => {
-            if (gob.mesh.userData) {
-                const body = gob.mesh.userData;
-                if (!gob.mesh.isDead) {
-                    if (Math.random() < 0.05) {
-                        const strength = 400;
-                        body.applyImpulse({ x: Math.random() * strength - strength / 2, y: Math.random() * strength - strength / 2 }, true);
-                    }
-                    body.setRotation(0, true);
-                }
-            }
-        });
 
         if (isFighting) {
 
@@ -629,74 +519,9 @@ const summonStuff = (x: number, y: number, z: number, force: number, angle: numb
 
 }
 
-let backgroundFade = 1;
-let fadeIntervalId = 0;
 addEventListener('click', (event) => {
-
-    if (playerHasBeenSummoned && !isFighting) {
-        // isFighting = true;
-        // playerSprite.setAnimation('knightSlashingRight');
-        // setTimeout(() => {
-        //     isFighting = false;
-        //     playerSprite.setAnimation('knightSlashingLeft');
-        // }, 1000);
-        obeyDiv.style.display = 'none';
-
-        groundMesh.visible = true;
-
-        const cameraTarget = camera.position.z + 20;
-
-        leftWallCollider.setCollisionGroups(0x00000000);
-        rightWallCollider.setCollisionGroups(0x00000000);
-        ceilingCollider.setCollisionGroups(0x00000000);
-
-        for (let g = 0; g < currentDocument.documentNumber; g++) {
-            const gobSprite = new AnimatedSprite('assets/textures/buildings/isekaied-gob.png', 16, gobAnimations);
-            gobSprite.randomAnimation();
-            const mesh = gobSprite.mesh;
-            mesh.position.copy(playerMesh.position);
-            mesh.position.z -= 0.01
-            mesh.position.x += Math.random() * 50 - 25;
-
-            const rigidBodyDesc = RAPIER.RigidBodyDesc
-                .dynamic()
-                .setTranslation(mesh.position.x, mesh.position.y)
-                .setLinearDamping(0.55)
-                .setCcdEnabled(true);
-            const rigidBody = world.createRigidBody(rigidBodyDesc);
-            const colliderDesc = RAPIER.ColliderDesc
-                .capsule(7, 1)
-                .setCollisionGroups(RapierGroupFactory.composeGroups(['gobs'], ['ground', 'summonedThings']))
-                .setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.DYNAMIC_DYNAMIC)
-                .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS)
-                .setRestitution(0.5);
-            const collider: Collider = world.createCollider(colliderDesc, rigidBody);
-            mesh.userData = rigidBody;
-
-            gobSprite.mesh.collider = collider;
-            gobSprite.mesh.life = 500;
-
-            gobs.push(gobSprite);
-            scene.add(mesh);
-        }
-
-        fadeIntervalId = window.setInterval(() => {
-            if (backgroundFade > 0) {
-                backgroundFade -= 0.01;
-                backgroundFade = Math.max(0, backgroundFade);
-                backgroundPlate.material.opacity = backgroundFade;
-                camera.position.z += 0.01 * 20;
-            } else {
-
-                obeyDiv.style.display = 'block';
-                obeyDiv.innerText = 'Use your summoning experience to defeat the goblins !';
-                isFighting = true;
-                camera.position.z = cameraTarget;
-                clearInterval(fadeIntervalId);
-            }
-        }, 20);
-
-    }
+    
+    stateManager.action('click');
 
     if (isFighting) {
 
@@ -766,7 +591,6 @@ loadAllLanguages().then(() => {
             playerSprite.setAnimation('typing');
         }
 
-        // createSummonsDocument(currentDocument.documentNumber);
         stateManager.action('work');
         stateManager.checkTransitions();
     }

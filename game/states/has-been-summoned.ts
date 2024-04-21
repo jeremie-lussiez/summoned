@@ -8,7 +8,9 @@ new THREE.AudioLoader().load('assets/audio/dundundun.mp3', (buffer) => {
 export const HAS_BEEN_SUMMONED_STATE_DEFINITION = {
     id: 'hasBeenSummoned',
     music: 'STOP',
-    data: {},
+    data: {
+        hasDoneSomething: false,
+    },
     init: (game: any, state: any) => {
         game.obeyDiv.style.display = 'block';
         game.obeyDiv.innerText = 'YOU have been summoned!';
@@ -18,6 +20,18 @@ export const HAS_BEEN_SUMMONED_STATE_DEFINITION = {
         dundundunSound.setVolume(0.50);
         dundundunSound.play();
     },
-    actions: {},
-    transitions: []
+    actions: {
+        click: (game: any, state: any) => {
+            state.hasDoneSomething = true;
+            game.obeyDiv.style.display = 'none';
+        }
+    },
+    transitions: [
+        {
+            condition: (game: any, state: any) => {
+                return state.hasDoneSomething;
+            },
+            target: 'fightingGoblins',
+        },
+    ]
 };
